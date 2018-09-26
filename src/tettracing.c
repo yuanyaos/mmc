@@ -202,22 +202,30 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 	int i,tshift,eid,faceidx=-1;
 	float w[6],Rv,ww,currweight,dlen=0.f,rc,mus; /*dlen is the physical distance*/
 	unsigned int *wi=(unsigned int*)w;
+	/* baryout: barycentric coordinate for pout. baryp0 */
         float baryout[4]={0.f,0.f,0.f,0.f},*baryp0=&(r->bary0.x);
 	float Lp0=0.f,ratio;
 
 	if(tracer->mesh==NULL || tracer->d==NULL||r->eid<=0||r->eid>tracer->mesh->ne) 
 		return -1;
 
+	/* index of enclosing tet */
 	eid=r->eid-1;
 	r->faceid=-1;
 	r->isend=0;
 	r->Lmove=0.f;
+	/* p0 and p1 are the point determining the ray */
 	vec_add(&(r->p0),&(r->vec),&p1);
+	/* pcrx is the vector perpendicular to vector p0 and p1 */
 	vec_cross(&(r->p0),&p1,&pcrx);
+	/* current elemnt */
 	ee=(int *)(tracer->mesh->elem+eid*tracer->mesh->elemlen);
+	/* property of current element */
 	prop=tracer->mesh->med+(tracer->mesh->type[eid]);
+	/* R_C0=1/(speed of light) */
 	rc=prop->n*R_C0;
-        currweight=r->weight;
+    /* current photon weight */
+    currweight=r->weight;
 	mus=(cfg->mcmethod==mmMCX) ? prop->mus : (prop->mua+prop->mus);
 
 #ifdef MMC_USE_SSE
@@ -227,11 +235,22 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 	    for(i=0;i<6;i++){
 	        D=_mm_load_ps(&(tracer->d[(eid)*6+i].x));
 	        M=_mm_load_ps(&(tracer->m[(eid)*6+i].x));
+  #ifdef __SSE4_1__
 		w[i]=_mm_cvtss_f32(_mm_add_ss(_mm_dp_ps(O,M,0x7F),_mm_dp_ps(T,D,0x7F)));
+  #else
+		M=_mm_mul_ps(O,M);
+		M=_mm_hadd_ps(M,M);
+		M=_mm_hadd_ps(M,M);
+		D=_mm_mul_ps(T,D);
+		D=_mm_hadd_ps(D,D);
+		D=_mm_hadd_ps(D,D);
+		_mm_store_ss(w+i,_mm_add_ss(M,D));
+  #endif
 	    }
 	}
 #else
 	for(i=0;i<6;i++)
+		/* Q: what is w? */
 		w[i]=pinner(&(r->vec),&pcrx,tracer->d+(eid)*6+i,tracer->m+(eid)*6+i);
 #endif
 	//exit(1);
@@ -245,7 +264,7 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 		if(F32N(wi[fc[i][0]]) & F32N(wi[fc[i][1]]) & F32P(wi[fc[i][2]])){
 			// f_leave
                         //if(cfg->debuglevel&dlTracingExit) MMC_FPRINTF(cfg->flog,"ray exits face %d[%d] of %d\n",i,faceorder[i],eid);
-
+						/* Q: what is this? */
                         Rv=1.f/(-w[fc[i][0]]-w[fc[i][1]]+w[fc[i][2]]);
                         baryout[nc[i][0]]=-w[fc[i][0]]*Rv;
                         baryout[nc[i][1]]=-w[fc[i][1]]*Rv;
@@ -257,7 +276,7 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 				tracer->mesh->node+ee[nc[i][2]]-1,&(r->pout));
 
                         //if(cfg->debuglevel&dlTracingExit) MMC_FPRINTF(cfg->flog,"exit point %f %f %f\n",r->pout.x,r->pout.y,r->pout.z);
-
+			/* My comment: distance between entry and exit point */
 			Lp0=dist(&(r->p0),&(r->pout));
 			dlen=(mus <= EPS) ? R_MIN_MUS : r->slen/mus;
 			faceidx=i;
@@ -276,29 +295,50 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 	                }
 #endif
 		       }
+		    	/* Lp0: the length between p0 and pout; dlen: the remaining length */
+		       /* if Lp0>dlen, current scattering event ends. Need to start a new one */
 			r->isend=(Lp0>dlen);
+			/* Last photon movement length */
 			r->Lmove=((r->isend) ? dlen : Lp0);
 			break;
 		}
 	}
+	/* total number of ray-tet tests */
 	visit->raytet++;
+	/* total number of ray-tet tests outside of the object mesh */
         if(tracer->mesh->type[eid]==0)
 		visit->raytet0++;
         if(r->pout.x!=MMC_UNDEFINED){
+
+
+
+
+        		/* photontimer: the total time-of-fly of the photon */
+        		/* things to do when the time ends */
                 if((int)((r->photontimer+r->Lmove*rc-cfg->tstart)*visit->rtstep)>=(int)((cfg->tend-cfg->tstart)*visit->rtstep)){ /*exit time window*/
 		   r->faceid=-2;
 	           r->pout.x=MMC_UNDEFINED;
 		   r->Lmove=(cfg->tend-r->photontimer)/(prop->n*R_C0)-1e-4f;
 		}
+
+
+
+
                 if(cfg->mcmethod==mmMCX){
 #ifdef __INTEL_COMPILER
+               /* Beer-Lambert Law: current photon weight */
 	           r->weight*=expf(-prop->mua*r->Lmove);
 #else
 	           r->weight*=fast_expf9(-prop->mua*r->Lmove);
 #endif
                 }
-		if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otJacobian){
+
+
+
+
+		if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otJacobian){ /* different output types */
 #ifdef __INTEL_COMPILER
+			/* Q: what does this mean? */
 		    currweight=expf(-DELTA_MUA*r->Lmove);
 #else
 		    currweight=fast_expf9(-DELTA_MUA*r->Lmove);
@@ -319,27 +359,45 @@ float plucker_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 		    currweight*=cfg->replayweight[r->photonid];
 		    currweight+=r->weight;
 		}
-                r->p0.x+=r->Lmove*r->vec.x;
-                r->p0.y+=r->Lmove*r->vec.y;
-                r->p0.z+=r->Lmove*r->vec.z;
-                //if(cfg->debuglevel&dlWeight) MMC_FPRINTF(cfg->flog,"update weight to %f and path end %d \n",r->weight,r->isend);
 
+
+
+
+		/* update the photon position */
+        r->p0.x+=r->Lmove*r->vec.x;
+        r->p0.y+=r->Lmove*r->vec.y;
+        r->p0.z+=r->Lmove*r->vec.z;
+        //if(cfg->debuglevel&dlWeight) MMC_FPRINTF(cfg->flog,"update weight to %f and path end %d \n",r->weight,r->isend);
+
+
+        /* piece-wise-constant basis for fluence */
 		if(!cfg->basisorder){
+						/* weight loss */
                         ww=currweight-r->weight;
+                        /* accumulated weight loss for one photon */
                         r->Eabsorb+=ww;
+                        /* timer for one phoron */
                         r->photontimer+=r->Lmove*rc;
 			if(cfg->outputtype==otWL || cfg->outputtype==otWP)
 				tshift=MIN( ((int)(cfg->replaytime[r->photonid]*visit->rtstep)), cfg->maxgate-1 )*tracer->mesh->ne;
 			else
+							/* the gate number */
                         	tshift=MIN( ((int)((r->photontimer-cfg->tstart)*visit->rtstep)), cfg->maxgate-1 )*tracer->mesh->ne;
+
+
                         if(cfg->mcmethod==mmMCX){
+                        	/* atomic operation */
                             if(cfg->isatomic)
 #pragma omp atomic
+                    /* energy deposit */
 		 	        tracer->mesh->weight[eid+tshift]+=ww;
                             else
                                 tracer->mesh->weight[eid+tshift]+=ww;
                         }
 		}else{
+
+
+					/* Q: what is this part (basisorder)? */
 	                if(cfg->debuglevel&dlBary) MMC_FPRINTF(cfg->flog,"Y [%f %f %f %f]\n",
         	              baryout[0],baryout[1],baryout[2],baryout[3]);
 
@@ -403,6 +461,7 @@ inline __m128 rcp_nr(const __m128 a){
     return _mm_sub_ps(_mm_add_ps(r, r),_mm_mul_ps(_mm_mul_ps(r, a), r));
 }
 
+#if !defined(__EMSCRIPTEN__)
 
 /** 
  * \brief Havel-based SSE4 ray-triangle intersection test
@@ -804,6 +863,17 @@ float badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 	return r->slen;
 }
 
+#else
+float badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
+	MMC_ERROR(-6,"wrong option, please recompile with SSE4 enabled");
+	return MMC_UNDEFINED;
+}
+float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
+	MMC_ERROR(-6,"wrong option, please recompile with SSE4 enabled");
+	return MMC_UNDEFINED;
+}
+#endif  /* #if !defined(__EMSCRIPTEN__) */
+
 /** 
  * \brief Branch-less Badouel-based SSE4 ray-tracer to advance photon by one step
  * 
@@ -865,6 +935,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	O = _mm_min_ss(O, S);
 	
 	_mm_store_ss(&(bary.x),O);
+	/* face that the photon is going to intersect */
 	faceidx=maskmap[_mm_movemask_ps(_mm_cmpeq_ps(T,_mm_set1_ps(bary.x)))];
 	r->faceid=faceorder[faceidx];
 
@@ -883,16 +954,21 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
             	    _mm_prefetch((char *)&(tracer->n[(r->nexteid-1)<<2].x),_MM_HINT_T0);
 	    }
 
+	    /* dlen: remaining scattering length */
 	    dlen=(mus <= EPS) ? R_MIN_MUS : r->slen/mus;
+	    /* distance to next tet */
 	    Lp0=bary.x;
 	    r->isend=(Lp0>dlen);
 	    r->Lmove=((r->isend) ? dlen : Lp0);
 
+	    /* O: direction cosine */
             O = _mm_load_ps(&(r->vec.x));
+        /* intinial position */
 	    S = _mm_load_ps(&(r->p0.x));
 	    T = _mm_set1_ps(bary.x);
 	    T = _mm_mul_ps(O, T);
 	    T = _mm_add_ps(T, S);
+	    /* T: the intersection of ray and tet */
 	    _mm_store_ps(&(r->pout.x),T);
 
 	    if((int)((r->photontimer+r->Lmove*rc-cfg->tstart)*visit->rtstep)>=(int)((cfg->tend-cfg->tstart)*visit->rtstep)){ /*exit time window*/
@@ -900,6 +976,9 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	       r->pout.x=MMC_UNDEFINED;
 	       r->Lmove=(cfg->tend-r->photontimer)/(prop->n*R_C0)-1e-4f;
 	    }
+
+
+	    /* weight loss */
             if(cfg->mcmethod==mmMCX){
 #ifdef __INTEL_COMPILER
 	       totalloss=expf(-prop->mua*r->Lmove);
@@ -909,6 +988,9 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
                r->weight*=totalloss;
             }
 	    totalloss=1.f-totalloss;
+
+
+
 	    if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otJacobian){
 #ifdef __INTEL_COMPILER
 		currweight=expf(-DELTA_MUA*r->Lmove);
@@ -922,7 +1004,15 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 		currweight*=cfg->replayweight[r->photonid];
 		currweight+=r->weight;
             }
+
+
+
+        /* update remaining scattering length */
 	    r->slen-=r->Lmove*mus;
+
+
+
+
 	    if(cfg->seed==SEED_FROM_FILE && cfg->outputtype==otWP){
 		if(r->slen0<EPS)
 		    currweight=1;
@@ -931,12 +1021,20 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 		currweight*=cfg->replayweight[r->photonid];
 		currweight+=r->weight;
 	    }
+
+
+
+
 	    if(bary.x>=0.f){
+	    	/* basisorder: determine storage on node or element */
 	        int framelen=(cfg->basisorder?tracer->mesh->nn:tracer->mesh->ne);
 		if(cfg->method==rtBLBadouelGrid)
 		    framelen=cfg->crop0.z;
+		/* weight loss */
 		ww=currweight-r->weight;
         	r->photontimer+=r->Lmove*rc;
+
+
 
 		if(cfg->outputtype==otWL || cfg->outputtype==otWP)
 			tshift=MIN( ((int)(cfg->replaytime[r->photonid]*visit->rtstep)), cfg->maxgate-1 )*framelen;
@@ -947,11 +1045,14 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
         	   r->p0.x,r->p0.y,r->p0.z,bary.x,eid+1,dlen);
 
 		if(prop->mua>0.f){
+		  /* energy deposit */
 		  r->Eabsorb+=ww;
 		  if(cfg->outputtype==otFlux || cfg->outputtype==otJacobian)
+		  	/* output type: flux */
                      ww/=prop->mua;
 		}
 
+		/* update p0 */
 	        T = _mm_set1_ps(r->Lmove);
 	        T = _mm_add_ps(S, _mm_mul_ps(O, T));
 	        _mm_store_ps(&(r->p0.x),T);
@@ -1059,6 +1160,7 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	float kahany, kahant;
 	ray r={cfg->srcpos,{cfg->srcdir.x,cfg->srcdir.y,cfg->srcdir.z},{MMC_UNDEFINED,0.f,0.f},cfg->bary0,cfg->e0,cfg->dim.y-1,0,0,1.f,0.f,0.f,0.f,0.f,0.,0,NULL,NULL,cfg->srcdir.w};
 
+	/* Use pointer array pointing to the function and call the functions */
 	float (*engines[5])(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit)=
 	       {plucker_raytet,havel_raytet,badouel_raytet,branchless_badouel_raytet,branchless_badouel_raytet};
 	float (*tracercore)(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit);
@@ -1070,7 +1172,9 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
                 r.photonseed=(void*)calloc(1,(sizeof(RandType)*RAND_BUF_LEN));
 		memcpy(r.photonseed,(void *)ran, (sizeof(RandType)*RAND_BUF_LEN));
         }
+    /* plucker_raytet */
 	tracercore=engines[0];
+	/* select ray-tracer */
 	if(cfg->method>=rtPlucker && cfg->method<=rtBLBadouelGrid)
 	    tracercore=engines[(int)(cfg->method)];
 	else
@@ -1078,6 +1182,7 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 
 	/*initialize the photon parameters*/
         launchphoton(cfg, &r, mesh, ran, ran0);
+    /* Q: what is reclen (record number per detected photon) */
 	r.partialpath[visit->reclen-2] = r.weight; /*last record in partialpath is the initial photon weight*/
 
 	/*use Kahan summation to accumulate weight, otherwise, counter stops at 16777216*/
@@ -1090,6 +1195,9 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	visit->kahanc=(kahant - visit->totalweight) - kahany;
 	visit->totalweight=kahant;
 
+
+
+
 #ifdef MMC_USE_SSE
 	const float int_coef_arr[4] = { -1.f, -1.f, -1.f, 1.f };
 	int_coef = _mm_load_ps(int_coef_arr);
@@ -1098,6 +1206,7 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	    r.slen=(*tracercore)(&r,tracer,cfg,visit);
 	    if(r.pout.x==MMC_UNDEFINED){
 	    	  if(r.faceid==-2) break; /*reaches the time limit*/
+	    	/* in case the photon intersects with node or edge */
 		  if(fixcount++<MAX_TRIAL){
 			fixphoton(&r.p0,mesh->node,(int *)(mesh->elem+(r.eid-1)*mesh->elemlen));
 			continue;
@@ -1105,10 +1214,17 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	    	  r.eid=-r.eid;
         	  r.faceid=-1;
 	    }
+	    /* record partial path length */
 	    if(cfg->issavedet && r.Lmove>0.f && mesh->type[r.eid-1]>0)
 	            r.partialpath[mesh->prop-1+mesh->type[r.eid-1]]+=r.Lmove;  /*second medianum block is the partial path*/
+	    
+
+
+
+	    /**********  start of inner loop ***********/
 	    /*move a photon until the end of the current scattering path*/
 	    while(r.faceid>=0 && !r.isend){
+	    	    /* update the p0 */
 	    	    memcpy((void *)&r.p0,(void *)&r.pout,sizeof(r.p0));
 
 	    	    enb=(int *)(mesh->facenb+(r.eid-1)*mesh->elemlen);
@@ -1120,7 +1236,7 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 			    reflectray(cfg,&r.vec,tracer,&oldeid,&r.eid,r.faceid,ran);
 		    }
 	    	    if(r.eid==0) break;
-		    /*when a photon enters the domain from the background*/
+		    /*when a photon enters the domain from the background (reflect back)*/
 		    if(mesh->type[oldeid-1]==0 && mesh->type[r.eid-1]){
                         if(cfg->debuglevel&dlExit)
 			    MMC_FPRINTF(cfg->flog,"e %f %f %f %f %f %f %f %d\n",r.p0.x,r.p0.y,r.p0.z,
@@ -1128,7 +1244,7 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
                         if(!cfg->voidtime)
                             r.photontimer=0.f;
                     }
-		    /*when a photon exits the domain into the background*/
+		    /*when a photon exits the domain into the background (transmission)*/
 		    if(mesh->type[oldeid-1] && mesh->type[r.eid-1]==0){
                         if(cfg->debuglevel&dlExit)
 		            MMC_FPRINTF(cfg->flog,"x %f %f %f %f %f %f %f %d\n",r.p0.x,r.p0.y,r.p0.z,
@@ -1142,7 +1258,10 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	    	    if(r.pout.x!=MMC_UNDEFINED && (cfg->debuglevel&dlMove))
 	    		MMC_FPRINTF(cfg->flog,"P %f %f %f %d %u %e\n",r.pout.x,r.pout.y,r.pout.z,r.eid,id,r.slen);
 
+	    	    /* call retracer, returning unitles remaining scattering length */
 	    	    r.slen=(*tracercore)(&r,tracer,cfg,visit);
+
+
 		    if(cfg->issavedet && r.Lmove>0.f && mesh->type[r.eid-1]>0)
 			r.partialpath[mesh->prop-1+mesh->type[r.eid-1]]+=r.Lmove;
 		    if(r.faceid==-2) break;
@@ -1159,6 +1278,12 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
         		break;
         	    }
 	    }
+
+	    /**********  end of inner loop ***********/
+
+
+
+	    /* debug */
 	    if(r.eid<=0 || r.pout.x==MMC_UNDEFINED) {
         	    if(r.eid==0 && (cfg->debuglevel&dlMove))
         		 MMC_FPRINTF(cfg->flog,"B %f %f %f %d %u %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen);
@@ -1190,7 +1315,11 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 		    }
 	    	    break;  /*photon exits boundary*/
 	    }
+
 	    if(cfg->debuglevel&dlMove) MMC_FPRINTF(cfg->flog,"M %f %f %f %d %u %e\n",r.p0.x,r.p0.y,r.p0.z,r.eid,id,r.slen);
+
+
+	    /* Russian roulette */
 	    if(cfg->minenergy>0.f && r.weight < cfg->minenergy && (cfg->tend-cfg->tstart)*visit->rtstep<=1.f){ /*Russian Roulette*/
 		if(rand_do_roulette(ran)*cfg->roulettesize<=1.f){
 			r.weight*=cfg->roulettesize;
@@ -1199,9 +1328,15 @@ float onephoton(unsigned int id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 		}else
 			break;
 	    }
+
+
+	    /* momentum */
             mom=0.f;
+            /* compute the new scattering length and direction cosine */
 	    r.slen0=mc_next_scatter(mesh->med[mesh->type[r.eid-1]].g,&r.vec,ran,ran0,cfg,&mom);
 	    r.slen=r.slen0;
+
+	    
             if(cfg->mcmethod!=mmMCX)
                   albedoweight(&r,mesh,cfg,visit);
             if(cfg->ismomentum && mesh->type[r.eid-1]>0)                     /*when ismomentum is set to 1*/
