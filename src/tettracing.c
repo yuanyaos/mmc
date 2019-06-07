@@ -29,6 +29,7 @@
 
 #include <string.h>
 #include <stdlib.h>
+#include <math.h>
 #include "tettracing.h"
 #include "fastmath.h"
 
@@ -41,6 +42,13 @@ __m128 int_coef;                            /**<  a global variable used for SSE
 
 #define F32N(a) ((a) & 0x80000000)          /**<  Macro to test if a floating point is negative */
 #define F32P(a) ((a) ^ 0x80000000)          /**<  Macro to test if a floating point is positive */
+
+
+/** 
+ * \mapping from edge index to node index
+ */
+
+const int e2n[6][2]={{0,1},{0,2},{0,3},{1,2},{1,3},{2,3}};
 
 /** 
  * \brief Tetrahedron face edge indices
@@ -918,6 +926,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	r->pout.x=MMC_UNDEFINED;
 	r->faceid=-1;
 	r->isend=0;
+	r->isvessel=0;
 
 	const __m128 Nx=_mm_load_ps(&(tracer->n[baseid].x));
 	const __m128 Ny=_mm_load_ps(&(tracer->n[baseid+1].x));
@@ -954,22 +963,110 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	if(r->faceid>=0 && bary.x>=0){
 	    medium *prop;
 	    int *enb, *ee=(int *)(tracer->mesh->elem+eid*tracer->mesh->elemlen);
+	    int en0, en1, last;
 	    float mus;
-	    prop=tracer->mesh->med+(tracer->mesh->type[eid]);
+	    if(r->inout){
+	    	last = sizeof(tracer->mesh->med)/sizeof(tracer->mesh->med[0])-1;	    	
+	    	prop = tracer->mesh->med[last];
+	    }else{
+	    	prop=tracer->mesh->med+(tracer->mesh->type[eid]);	    	
+	    }
 	    rc=prop->n*R_C0;
             currweight=r->weight;
             mus=(cfg->mcmethod==mmMCX) ? prop->mus : (prop->mua+prop->mus);
-
             enb=(int *)(tracer->mesh->facenb+eid*tracer->mesh->elemlen);
             r->nexteid=enb[r->faceid]; // if I use nexteid-1, the speed got slower, strange!
 	    if(r->nexteid>0){
             	    _mm_prefetch((char *)&(tracer->n[(r->nexteid-1)<<2].x),_MM_HINT_T0);
 	    }
 
+	    en0 = ee[e2n[r->vesselid[0]][0]]-1;		// get node index, node index starts from 1 in MATLAB but from 0 in C
+	    en1 = ee[e2n[r->vesselid[0]][1]]-1;
+	    // E0 = _mm_load_ps(&(tracer->mesh->node[en0].x));
+	    // E1 = _mm_load_ps(&(tracer->mesh->node[en1].x));
+	    float3 u, E0, E1, OP, P, Pt, PP0, PP1, fzero = {0.0f, 0.0f, 0.0f};
+	    float norm, normr, st, DIS0, DIS1, pt0[2], pt1[2], theta, ph0[2],ph1[2],Lratio;
+	    E0 = tracer->mesh->node[en0];
+	    E1 = tracer->mesh->node[en1];
+	    vec_diff(&E0,&E1,&u);
+	    norm = dist(&E0,&E1);	// get coordinates and compute distance between two nodes
+	    normr = 1/norm;
+	    vec_mult(&u,normr,&u);	// normal vector of the edge
+
 	    dlen=(mus <= EPS) ? R_MIN_MUS : r->slen/mus;
 	    Lp0=bary.x;
 	    r->isend=(Lp0>dlen);
 	    r->Lmove=((r->isend) ? dlen : Lp0);
+
+	    P = r->p0;				// P0
+	    vec_diff(&E0,&P,&OP);
+	    st = vec_dot(&OP,&u);
+	    vec_mult(&u,st,&Pt);
+	    vec_diff(&Pt,&OP,&PP0);		// PP0: P0 projection on plane
+	    DIS0 = dist(PP0,fzero);
+
+	    vec_mult(&r->vec,r->Lmove,&P);
+	    vec_add(&r->p0,&P,&P);		// P1
+	    vec_diff(&E0,&P,&OP);
+	    st = vec_dot(&OP,&u);
+	    vec_mult(&u,st,&Pt);
+	    vec_diff(&Pt,&OP,&PP1);		// PP1: P1 projection on plane
+	    DIS1 = dist(PP1,fzero);
+
+	    // update Lmove and reflection
+	    float dx, dy, dr2, drr2, Dt, delta, rt, sgn, xa, xb, ya, yb, Dp;
+	    rt = r->vesselr[0];
+	    if((DIS0>rt && DIS1<rt) || (DIS0<rt && DIS1>rt))	// hit vessel out->in or in->out
+	    {
+	    	r->isvessel = 1;
+	    	theta = vec_dot(PP0,PP1);
+	    	theta = theta/(DIS0*DIS1+EPS);
+
+	    	pt0[0] = DIS0;
+		pt0[1] = 0;
+		pt1[0] = DIS1*theta;
+		pt1[1] = DIS1*sqrtf(1-theta*theta);
+	    	dx = pt1[0]-pt0[0];
+	    	dy = pt1[1]-pt0[1];
+	    	dr2 = dx*dx+dy*dy;
+	    	drr2 = 1/dr2;
+	    	Dt = pt0[0]*pt1[1];
+	    	delta = sqrtf(rt*rt*dr2-Dt*Dt);	// must be >0
+	    	sgn = (dy>=0) ? 1.0f : -1.0f;
+	    	xa = Dt*dy*drr2;
+	    	xb = sgn*dx*delta*drr2;
+	    	ya = -Dt*dx*drr2;
+	    	yb = fabs(dy)*delta*drr2;
+	    	ph0[0] = xa+xb;
+	    	ph0[1] = ya+yb;
+	    	ph1[0] = xa-xb;
+	    	ph1[1] = ya-yb;
+	    	Dp = (pt1[0]-pt0[0])*(pt1[0]-pt0[0])+(pt1[1]-pt0[1])*(pt1[1]-pt0[1]);
+	    	if(DIS0>rt && DIS1<rt){		// out->in
+	    		Lratio = (ph1[0]-pt0[0])*(ph1[0]-pt0[0])+(ph1[1]-pt0[1])*(ph1[1]-pt0[1]);	    	
+	    		if(Dp>Lratio){
+	    			Lratio = sqrtf(Lratio/Dp);
+	    		}else{
+	    			Lratio = (ph0[0]-pt0[0])*(ph0[0]-pt0[0])+(ph0[1]-pt0[1])*(ph0[1]-pt0[1]);
+	    			Lratio = sqrtf(Lratio/Dp);
+	    		}
+	    	}else{	// DIS0<rt && DIS1>rt, in->out
+	    		Lratio = (ph1[0]-pt1[0])*(ph1[0]-pt1[0])+(ph1[1]-pt1[1])*(ph1[1]-pt1[1]);	    	
+	    		if(Dp>Lratio){
+	    			Lratio = 1-sqrtf(Lratio/Dp);
+	    		}else{
+	    			Lratio = (ph0[0]-pt1[0])*(ph0[0]-pt1[0])+(ph0[1]-pt1[1])*(ph0[1]-pt1[1]);
+	    			Lratio = 1-sqrtf(Lratio/Dp);
+	    		}
+	    	}
+	    	r->Lmove = r->Lmove*Lratio;	    	
+	    }
+	    // else if(!(DIS0>=rt && DIS1>=rt)){	// inside vessel
+	    // 	last = sizeof(tracer->mesh->med)/sizeof(tracer->mesh->med[0])-1;	    	
+	    // 	prop = tracer->mesh->med[last];
+	    // }else{				// outside vessel
+	    	
+	    // }
 
             O = _mm_load_ps(&(r->vec.x));
 	    S = _mm_load_ps(&(r->p0.x));
@@ -1151,10 +1248,11 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
                 RandType *ran, RandType *ran0, visitor *visit){
 
 	int oldeid,fixcount=0,exitdet=0;
-	int *enb;
+	int *enb, *vid;
+	float *vr;
         float mom;
 	float kahany, kahant;
-	ray r={cfg->srcpos,{cfg->srcdir.x,cfg->srcdir.y,cfg->srcdir.z},{MMC_UNDEFINED,0.f,0.f},cfg->bary0,cfg->e0,cfg->dim.y-1,0,0,1.f,0.f,0.f,0.f,0.f,0.,0,NULL,NULL,cfg->srcdir.w,0,0xFFFFFFFF,0.0};
+	ray r={cfg->srcpos,{cfg->srcdir.x,cfg->srcdir.y,cfg->srcdir.z},{MMC_UNDEFINED,0.f,0.f},cfg->bary0,cfg->e0,cfg->dim.y-1,0,0,1.f,0.f,0.f,0.f,0.f,0.,0,NULL,NULL,cfg->srcdir.w,0,0xFFFFFFFF,0.0,{0,0},{0.f,0.f}};
 
 	float (*engines[5])(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit)=
 	       {plucker_raytet,havel_raytet,badouel_raytet,branchless_badouel_raytet,branchless_badouel_raytet};
@@ -1209,6 +1307,13 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	int_coef = _mm_load_ps(int_coef_arr);
 #endif
 	while(1){  /*propagate a photon until exit*/
+	     vid = (int *)(mesh->vessel+(r.eid-1)*2);
+	     r.vesselid[0] = vid[0];
+	     r.vesselid[1] = vid[1];
+	     vr = (float *)(mesh->radius+(r.eid-1)*2);
+	     r.vesselr[0] = vr[0];
+	     r.vesselr[1] = vr[1];
+
 	    r.slen=(*tracercore)(&r,tracer,cfg,visit);
 	    if(r.pout.x==MMC_UNDEFINED){
 	    	  if(r.faceid==-2) break; /*reaches the time limit*/
@@ -1256,6 +1361,13 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	    	    if(r.pout.x!=MMC_UNDEFINED && (cfg->debuglevel&dlMove))
 	    		MMC_FPRINTF(cfg->flog,"P %f %f %f %d %lu %e\n",r.pout.x,r.pout.y,r.pout.z,r.eid,id,r.slen);
 
+	    	    vid = (int *)(mesh->vessel+(r.eid-1)*2);
+	     	    r.vesselid[0] = vid[0];
+	     	    r.vesselid[1] = vid[1];
+	     	    vr = (float *)(mesh->radius+(r.eid-1)*2);
+	     	    r.vesselr[0] = vr[0];
+	     	    r.vesselr[1] = vr[1];
+	     	    
 	    	    r.slen=(*tracercore)(&r,tracer,cfg,visit);
 		    if(cfg->issavedet && r.Lmove>0.f && mesh->type[r.eid-1]>0)
 			r.partialpath[mesh->prop-1+mesh->type[r.eid-1]]+=r.Lmove;
@@ -1363,6 +1475,18 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	    }
 }
 	}
+}
+
+float reflectvessel(float3 Ph, float3 Pr, float3 u){
+	float3 v,pnorm,pt,fzero = {0.0f, 0.0f, 0.0f};
+	float s;
+	vec_diff(&Pr,&Ph,&v);
+	s = vec_dot(&u,&v);
+	vec_mult(&u,s,&pt);
+	vec_diff(&pt,&v,&pnorm);
+	s = dist(&pnorm,&fzero);
+	s = 1/s;
+	vec_mult(&pnorm,s,&pnorm);
 }
 
 /**

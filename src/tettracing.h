@@ -64,6 +64,10 @@ typedef struct MMC_ray{
 	unsigned int posidx;	      /**< launch position index of the photon for pattern source type */
 	unsigned int oldidx;
 	double oldweight;
+	int vesselid[2];	      /**< local edge id for vessels */
+	float vesselr[2];	      /**< vessel radius corresponding to vesselid */
+	int isvessel;		      /**< if 1, the photon hits the vessel; if 0, does not hit vessel */
+	int inout;		      /**< if 1, inside vessel; if 0, outside vessel */
 } ray;
 
 /***************************************************************************//**
