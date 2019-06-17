@@ -494,7 +494,29 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
         for(i=0;i<mesh->ne;i++)
            mesh->type[i]=val[i];
         printf("mmc.ne=%d;\n",mesh->ne);
-    }else if(strcmp(name,"facenb")==0){
+    }
+    else if(strcmp(name,"radius")==0){
+        arraydim=mxGetDimensions(item);
+        if(MAX(arraydim[0],arraydim[1])==0)
+            MEXERROR("the 'radius' field can not be empty");
+        double *val=mxGetPr(item);
+        mesh->ne=MAX(arraydim[0],arraydim[1]);
+        if(mesh->radius) free(mesh->radius);
+        mesh->radius=(int  *)malloc(sizeof(int )*mesh->ne);
+        for(i=0;i<mesh->ne;i++)
+           mesh->radius[i]=val[i];
+    }else if(strcmp(name,"vessel")==0){
+        arraydim=mxGetDimensions(item);
+        if(MAX(arraydim[0],arraydim[1])==0)
+            MEXERROR("the 'vessel' field can not be empty");
+        double *val=mxGetPr(item);
+        mesh->ne=MAX(arraydim[0],arraydim[1]);
+        if(mesh->vessel) free(mesh->vessel);
+        mesh->vessel=(int  *)malloc(sizeof(int )*mesh->ne);
+        for(i=0;i<mesh->ne;i++)
+           mesh->vessel[i]=val[i];
+    }
+    else if(strcmp(name,"facenb")==0){
         arraydim=mxGetDimensions(item);
 	if(arraydim[0]<=0 || arraydim[1]<4)
             MEXERROR("the 'elem' field must have 4 columns (e1,e2,e3,e4)");
