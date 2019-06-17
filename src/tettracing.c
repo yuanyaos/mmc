@@ -980,8 +980,10 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
             	    _mm_prefetch((char *)&(tracer->n[(r->nexteid-1)<<2].x),_MM_HINT_T0);
 	    }
 
-	    en0 = ee[e2n[r->vesselid[0]][0]]-1;		// get node index, node index starts from 1 in MATLAB but from 0 in C
-	    en1 = ee[e2n[r->vesselid[0]][1]]-1;
+	    en0 = ee[e2n[r->vesselid][0]]-1;
+	    en1 = ee[e2n[r->vesselid][1]]-1;
+	    // en0 = ee[e2n[r->vesselid[0]][0]]-1;		// get node index, node index starts from 1 in MATLAB but from 0 in C
+	    // en1 = ee[e2n[r->vesselid[0]][1]]-1;
 	    // E0 = _mm_load_ps(&(tracer->mesh->node[en0].x));
 	    // E1 = _mm_load_ps(&(tracer->mesh->node[en1].x));
 	    float3 u, E0, E1, OP, P, Pt, PP0, PP1, fzero = {0.0f, 0.0f, 0.0f};
@@ -992,6 +994,8 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	    norm = dist(&E0,&E1);	// get coordinates and compute distance between two nodes
 	    normr = 1/norm;
 	    vec_mult(&u,normr,&u);	// normal vector of the edge
+	    r->u = u;
+	    r->E = E0;
 
 	    dlen=(mus <= EPS) ? R_MIN_MUS : r->slen/mus;
 	    Lp0=bary.x;
@@ -1003,7 +1007,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	    st = vec_dot(&OP,&u);
 	    vec_mult(&u,st,&Pt);
 	    vec_diff(&Pt,&OP,&PP0);		// PP0: P0 projection on plane
-	    DIS0 = dist(PP0,fzero);
+	    DIS0 = dist(PP0,fzero);	    
 
 	    vec_mult(&r->vec,r->Lmove,&P);
 	    vec_add(&r->p0,&P,&P);		// P1
@@ -1015,11 +1019,11 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 
 	    // update Lmove and reflection
 	    float dx, dy, dr2, drr2, Dt, delta, rt, sgn, xa, xb, ya, yb, Dp;
-	    rt = r->vesselr[0];
+	    rt = r->vesselr;
 	    if((DIS0>rt && DIS1<rt) || (DIS0<rt && DIS1>rt))	// hit vessel out->in or in->out
 	    {
 	    	r->isvessel = 1;
-	    	theta = vec_dot(PP0,PP1);
+	    	theta = vec_dot(&PP0,&PP1);
 	    	theta = theta/(DIS0*DIS1+EPS);
 
 	    	pt0[0] = DIS0;
@@ -1043,6 +1047,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	    	ph1[1] = ya-yb;
 	    	Dp = (pt1[0]-pt0[0])*(pt1[0]-pt0[0])+(pt1[1]-pt0[1])*(pt1[1]-pt0[1]);
 	    	if(DIS0>rt && DIS1<rt){		// out->in
+	    		r->inout = 1;
 	    		Lratio = (ph1[0]-pt0[0])*(ph1[0]-pt0[0])+(ph1[1]-pt0[1])*(ph1[1]-pt0[1]);	    	
 	    		if(Dp>Lratio){
 	    			Lratio = sqrtf(Lratio/Dp);
@@ -1051,6 +1056,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	    			Lratio = sqrtf(Lratio/Dp);
 	    		}
 	    	}else{	// DIS0<rt && DIS1>rt, in->out
+	    		r->inout = 0;
 	    		Lratio = (ph1[0]-pt1[0])*(ph1[0]-pt1[0])+(ph1[1]-pt1[1])*(ph1[1]-pt1[1]);	    	
 	    		if(Dp>Lratio){
 	    			Lratio = 1-sqrtf(Lratio/Dp);
@@ -1061,12 +1067,12 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	    	}
 	    	r->Lmove = r->Lmove*Lratio;	    	
 	    }
-	    // else if(!(DIS0>=rt && DIS1>=rt)){	// inside vessel
-	    // 	last = sizeof(tracer->mesh->med)/sizeof(tracer->mesh->med[0])-1;	    	
-	    // 	prop = tracer->mesh->med[last];
-	    // }else{				// outside vessel
-	    	
-	    // }
+	    else if((DIS0<=rt && DIS1>=rt) || (DIS0>rt && DIS1>rt)) {
+	    	r->inout = 0;
+	    }
+	    else if((DIS0>=rt && DIS1<=rt) || (DIS0<rt && DIS1<rt)) {
+	    	r->inout = 1;
+	    }
 
             O = _mm_load_ps(&(r->vec.x));
 	    S = _mm_load_ps(&(r->p0.x));
@@ -1307,12 +1313,16 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	int_coef = _mm_load_ps(int_coef_arr);
 #endif
 	while(1){  /*propagate a photon until exit*/
-	     vid = (int *)(mesh->vessel+(r.eid-1)*2);
-	     r.vesselid[0] = vid[0];
-	     r.vesselid[1] = vid[1];
-	     vr = (float *)(mesh->radius+(r.eid-1)*2);
-	     r.vesselr[0] = vr[0];
-	     r.vesselr[1] = vr[1];
+	     vid = (int *)(mesh->vessel+(r.eid-1));
+	     r.vesselid = *vid;
+	     vr = (float *)(mesh->radius+(r.eid-1));
+	     r.vesselr = *vr;
+	     // vid = (int *)(mesh->vessel+(r.eid-1)*2);
+	     // r.vesselid[0] = vid[0];
+	     // r.vesselid[1] = vid[1];
+	     // vr = (float *)(mesh->radius+(r.eid-1)*2);
+	     // r.vesselr[0] = vr[0];
+	     // r.vesselr[1] = vr[1];
 
 	    r.slen=(*tracercore)(&r,tracer,cfg,visit);
 	    if(r.pout.x==MMC_UNDEFINED){
@@ -1326,6 +1336,13 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	    }
 	    if(cfg->issavedet && r.Lmove>0.f && mesh->type[r.eid-1]>0 && r.faceid>=0)
 	            r.partialpath[mesh->prop-1+mesh->type[r.eid-1]]+=r.Lmove;  /*second medianum block is the partial path*/
+	    
+	    if(cfg->isreflect && r.isvessel){
+	    	// reflectvessel(float3 *c0,float3 *u,float3 *ph,float3 *E0,raytracer *tracer,int *eid,int *inout,RandType *ran)
+	    	    reflectvessel(&r.vec,&r.u,&r.p0,&r.E,tracer,&r.eid,&r.inout,ran);
+	    	    continue;
+	    }
+
 	    /*move a photon until the end of the current scattering path*/
 	    while(r.faceid>=0 && !r.isend){
 	    	    memcpy((void *)&r.p0,(void *)&r.pout,sizeof(r.p0));
@@ -1334,7 +1351,7 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 		    oldeid=r.eid;
 	    	    r.eid=enb[r.faceid];
 
-		    if(cfg->isreflect && (r.eid<=0 || mesh->med[mesh->type[r.eid-1]].n != mesh->med[mesh->type[oldeid-1]].n )){
+		    if(cfg->isreflect && (r.eid<=0 || mesh->med[mesh->type[r.eid-1]].n != mesh->med[mesh->type[oldeid-1]].n ) && !r.inout){
 			if(! (r.eid<=0 && mesh->med[mesh->type[oldeid-1]].n == cfg->nout ))
 			    reflectray(cfg,&r.vec,tracer,&oldeid,&r.eid,r.faceid,ran);
 		    }
@@ -1361,12 +1378,16 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	    	    if(r.pout.x!=MMC_UNDEFINED && (cfg->debuglevel&dlMove))
 	    		MMC_FPRINTF(cfg->flog,"P %f %f %f %d %lu %e\n",r.pout.x,r.pout.y,r.pout.z,r.eid,id,r.slen);
 
-	    	    vid = (int *)(mesh->vessel+(r.eid-1)*2);
-	     	    r.vesselid[0] = vid[0];
-	     	    r.vesselid[1] = vid[1];
-	     	    vr = (float *)(mesh->radius+(r.eid-1)*2);
-	     	    r.vesselr[0] = vr[0];
-	     	    r.vesselr[1] = vr[1];
+	    	    vid = (int *)(mesh->vessel+(r.eid-1));
+		    r.vesselid = *vid;
+		    vr = (float *)(mesh->radius+(r.eid-1));
+		    r.vesselr = *vr;
+	    	    // vid = (int *)(mesh->vessel+(r.eid-1)*2);
+	     	   //  r.vesselid[0] = vid[0];
+	     	   //  r.vesselid[1] = vid[1];
+	     	   //  vr = (float *)(mesh->radius+(r.eid-1)*2);
+	     	   //  r.vesselr[0] = vr[0];
+	     	   //  r.vesselr[1] = vr[1];
 	     	    
 	    	    r.slen=(*tracercore)(&r,tracer,cfg,visit);
 		    if(cfg->issavedet && r.Lmove>0.f && mesh->type[r.eid-1]>0)
@@ -1477,16 +1498,77 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	}
 }
 
-float reflectvessel(float3 Ph, float3 Pr, float3 u){
-	float3 v,pnorm,pt,fzero = {0.0f, 0.0f, 0.0f};
-	float s;
-	vec_diff(&Pr,&Ph,&v);
-	s = vec_dot(&u,&v);
-	vec_mult(&u,s,&pt);
-	vec_diff(&pt,&v,&pnorm);
-	s = dist(&pnorm,&fzero);
-	s = 1/s;
-	vec_mult(&pnorm,s,&pnorm);
+/**
+ * @brief Calculate the reflection/transmission of a ray at the vessel
+ *
+ * This function handles the reflection and transmission events at the vessel wall
+ * where the refractive indices mismatch.
+ *
+ * \param[in] c0: the current direction vector of the ray
+ * \param[in] u: the current direction vector of the edge
+ * \param[in] ph: hitting position at the vessel
+ * \param[in] E0: any point on the edge
+ * \param[in] tracer: the ray-tracer aux data structure
+ * \param[in] eid: the index of the CURRENT element
+ * \param[in,out] ran: the random number generator states
+ */
+
+float reflectvessel(float3 *c0,float3 *u,float3 *ph,float3 *E0,raytracer *tracer,int *eid,int *inout,RandType *ran){
+
+	/*to handle refractive index mismatch*/
+        float3 pnorm={0.f}, *pn=&pnorm, EH, ut;
+	float Icos,Re,Im,Rtotal,tmp0,tmp1,tmp2,n1,n2;
+	int last;
+
+	vec_diff(E0,ph,&EH);
+	tmp0 = vec_dot(&EH,u);
+	vec_mult(u,tmp0,&ut);
+	vec_diff(&ut,&EH,pn);
+	tmp0=1.f/sqrt(vec_dot(pn,pn));
+	vec_mult(pn,tmp0,pn);
+	/*pn pointing outward*/
+
+	/*compute the cos of the incidence angle*/
+        Icos=fabs(vec_dot(c0,pn));
+
+        last = sizeof(tracer->mesh->med)/sizeof(tracer->mesh->med[0])-1;
+        if(*inout){	// out->in
+        	n1 = tracer->mesh->med[tracer->mesh->type[*eid-1]].n;
+        	n2 = tracer->mesh->med[last].n;		
+        }else{		// in->out
+        	n1 = tracer->mesh->med[last].n;
+		n2 = tracer->mesh->med[tracer->mesh->type[*eid-1]].n;
+        }
+
+	tmp0=n1*n1;
+	tmp1=n2*n2;
+        tmp2=1.f-tmp0/tmp1*(1.f-Icos*Icos); /*1-[n1/n2*sin(si)]^2 = cos(ti)^2*/
+
+        if(tmp2>0.f){ /*if no total internal reflection*/
+          Re=tmp0*Icos*Icos+tmp1*tmp2;      /*transmission angle*/
+	  tmp2=sqrt(tmp2); /*to save one sqrt*/
+          Im=2.f*n1*n2*Icos*tmp2;
+          Rtotal=(Re-Im)/(Re+Im);     /*Rp*/
+          Re=tmp1*Icos*Icos+tmp0*tmp2*tmp2;
+          Rtotal=(Rtotal+(Re-Im)/(Re+Im))*0.5f; /*(Rp+Rs)/2*/
+	  // if(*oldeid==*eid) return Rtotal; /*initial specular reflection*/
+	  if(rand_next_reflect(ran)<=Rtotal){ /*do reflection*/
+              vec_mult_add(pn,c0,-2.f*Icos,1.f,c0);
+              *inout = !(*inout);
+              //if(cfg->debuglevel&dlReflect) MMC_FPRINTF(cfg->flog,"R %f %f %f %d %d %f\n",c0->x,c0->y,c0->z,*eid,*oldeid,Rtotal);
+	  }else if(cfg->isspecular==2 && *eid==0){
+              // if do transmission, but next neighbor is 0, terminate
+          }else{                              /*do transmission*/
+              vec_mult_add(pn,c0,-Icos,1.f,c0);
+              vec_mult_add(pn,c0,tmp2,n1/n2,c0);
+	  }
+       }else{ /*total internal reflection*/
+          vec_mult_add(pn,c0,-2.f*Icos,1.f,c0);
+          *inout = !(*inout);
+       }
+       tmp0=1.f/sqrt(vec_dot(c0,c0));
+       vec_mult(c0,tmp0,c0);
+       return 1.f;
 }
 
 /**
@@ -1579,6 +1661,7 @@ void launchphoton(mcconfig *cfg, ray *r, tetmesh *mesh, RandType *ran, RandType 
         float3 origin={r->p0.x,r->p0.y,r->p0.z};
 
 	r->slen=rand_next_scatlen(ran);
+	r->inout = 0;
 	if(cfg->srctype==stPencil){ // pencil beam, use the old workflow, except when eid is not given
 		if(r->eid>0)
 		      return;
