@@ -502,9 +502,10 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
         double *val=mxGetPr(item);
         mesh->ne=MAX(arraydim[0],arraydim[1]);
         if(mesh->radius) free(mesh->radius);
-        mesh->radius=(int  *)malloc(sizeof(int )*mesh->ne);
+        mesh->radius=(float  *)malloc(sizeof(int )*mesh->ne);
         for(i=0;i<mesh->ne;i++)
            mesh->radius[i]=val[i];
+        printf("mmc.radius=;\n");
     }else if(strcmp(name,"vessel")==0){
         arraydim=mxGetDimensions(item);
         if(MAX(arraydim[0],arraydim[1])==0)
@@ -515,6 +516,7 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
         mesh->vessel=(int  *)malloc(sizeof(int )*mesh->ne);
         for(i=0;i<mesh->ne;i++)
            mesh->vessel[i]=val[i];
+        printf("mmc.vessel=;\n");
     }
     else if(strcmp(name,"facenb")==0){
         arraydim=mxGetDimensions(item);

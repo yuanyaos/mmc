@@ -908,7 +908,6 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
  */
 
 float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
-
 	float3 bary={1e10f,0.f,0.f,0.f};
 	float Lp0=0.f,rc,currweight,dlen,ww,totalloss=0.f;
 	int tshift,faceidx=-1,baseid,eid;
@@ -1008,7 +1007,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	    st = vec_dot(&OP,&u);
 	    vec_mult(&u,st,&Pt);
 	    vec_diff(&Pt,&OP,&PP0);		// PP0: P0 projection on plane
-	    DIS0 = dist(&PP0,&fzero);	    
+	    DIS0 = dist(&PP0,&fzero);
 
 	    vec_mult(&r->vec,r->Lmove,&PP);
 	    vec_add(&r->p0,&PP,&PP);		// P1
@@ -1021,8 +1020,10 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	    // update Lmove and reflection
 	    float dx, dy, dr2, drr2, Dt, delta, rt, sgn, xa, xb, ya, yb, Dp;
 	    rt = r->vesselr;
-	    if((DIS0>rt && DIS1<rt) || (DIS0<rt && DIS1>rt))	// hit vessel out->in or in->out
-	    {
+	    // printf("Radius=%f\n",rt);
+	    if((DIS0>rt+EPS && DIS1<rt-EPS) || (DIS0<rt-EPS && DIS1>rt+EPS))	// hit vessel out->in or in->out
+	    {	
+	    	// printf("DIS0=%f DIS1=%f\n",DIS0,DIS1);
 	    	r->isvessel = 1;
 	    	theta = vec_dot(&PP0,&PP1);
 	    	theta = theta/(DIS0*DIS1+EPS);
@@ -1066,13 +1067,17 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	    			Lratio = 1-sqrtf(Lratio/Dp);
 	    		}
 	    	}
-	    	r->Lmove = r->Lmove*Lratio;	    	
+	    	r->Lmove = r->Lmove*Lratio;
 	    }
 	    else if((DIS0<=rt && DIS1>=rt) || (DIS0>rt && DIS1>rt)) {
 	    	r->inout = 0;
+	    	// printf("DIS0=%f DIS1=%f\n",DIS0,DIS1);
 	    }
 	    else if((DIS0>=rt && DIS1<=rt) || (DIS0<rt && DIS1<rt)) {
 	    	r->inout = 1;
+	    	// printf("DIS0=%f DIS1=%f\n",DIS0,DIS1);
+	    }else{
+	    	// printf("Extra case\n");
 	    }
 
             O = _mm_load_ps(&(r->vec.x));
@@ -1314,6 +1319,7 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	const float int_coef_arr[4] = { -1.f, -1.f, -1.f, 1.f };
 	int_coef = _mm_load_ps(int_coef_arr);
 #endif
+	// int count = 0;
 	while(1){  /*propagate a photon until exit*/
 	     vid = (int *)(mesh->vessel+(r.eid-1));
 	     r.vesselid = *vid;
@@ -1342,6 +1348,8 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	    if(cfg->isreflect && r.isvessel){
 	    	// reflectvessel(mcconfig *cfg,float3 *c0,float3 *u,float3 *ph,float3 *E0,raytracer *tracer,int *eid,int *inout,RandType *ran)
 	    	    reflectvessel(cfg,&r.vec,&r.u,&r.p0,&r.E,tracer,&r.eid,&r.inout,ran);
+	    	// printf("count%d\n",count);
+	    	// count++;
 	    	    continue;
 	    }
 
@@ -1518,58 +1526,58 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 float reflectvessel(mcconfig *cfg,float3 *c0,float3 *u,float3 *ph,float3 *E0,raytracer *tracer,int *eid,int *inout,RandType *ran){
 
 	/*to handle refractive index mismatch*/
-        float3 pnorm={0.f}, *pn=&pnorm, EH, ut;
-	float Icos,Re,Im,Rtotal,tmp0,tmp1,tmp2,n1,n2;
-	int last;
+ //        float3 pnorm={0.f}, *pn=&pnorm, EH, ut;
+	// float Icos,Re,Im,Rtotal,tmp0,tmp1,tmp2,n1,n2;
+	// int last;
 
-	vec_diff(E0,ph,&EH);
-	tmp0 = vec_dot(&EH,u);
-	vec_mult(u,tmp0,&ut);
-	vec_diff(&ut,&EH,pn);
-	tmp0=1.f/sqrt(vec_dot(pn,pn));
-	vec_mult(pn,tmp0,pn);
+	// vec_diff(E0,ph,&EH);
+	// tmp0 = vec_dot(&EH,u);
+	// vec_mult(u,tmp0,&ut);
+	// vec_diff(&ut,&EH,pn);
+	// tmp0=1.f/sqrt(vec_dot(pn,pn));
+	// vec_mult(pn,tmp0,pn);
 	/*pn pointing outward*/
 
-	/*compute the cos of the incidence angle*/
-        Icos=fabs(vec_dot(c0,pn));
+	// /*compute the cos of the incidence angle*/
+ //        Icos=fabs(vec_dot(c0,pn));
 
-        last = sizeof(tracer->mesh->med)/sizeof(tracer->mesh->med[0]);
-        if(*inout){	// out->in
-        	n1 = tracer->mesh->med[tracer->mesh->type[*eid-1]].n;
-        	n2 = tracer->mesh->med[last].n;		
-        }else{		// in->out
-        	n1 = tracer->mesh->med[last].n;
-		n2 = tracer->mesh->med[tracer->mesh->type[*eid-1]].n;
-        }
+ //        last = sizeof(tracer->mesh->med)/sizeof(tracer->mesh->med[0]);
+ //        if(*inout){	// out->in
+ //        	n1 = tracer->mesh->med[tracer->mesh->type[*eid-1]].n;
+ //        	n2 = tracer->mesh->med[last].n;		
+ //        }else{		// in->out
+ //        	n1 = tracer->mesh->med[last].n;
+	// 	n2 = tracer->mesh->med[tracer->mesh->type[*eid-1]].n;
+ //        }
 
-	tmp0=n1*n1;
-	tmp1=n2*n2;
-        tmp2=1.f-tmp0/tmp1*(1.f-Icos*Icos); /*1-[n1/n2*sin(si)]^2 = cos(ti)^2*/
+	// tmp0=n1*n1;
+	// tmp1=n2*n2;
+ //        tmp2=1.f-tmp0/tmp1*(1.f-Icos*Icos); /*1-[n1/n2*sin(si)]^2 = cos(ti)^2*/
 
-        if(tmp2>0.f){ /*if no total internal reflection*/
-          Re=tmp0*Icos*Icos+tmp1*tmp2;      /*transmission angle*/
-	  tmp2=sqrt(tmp2); /*to save one sqrt*/
-          Im=2.f*n1*n2*Icos*tmp2;
-          Rtotal=(Re-Im)/(Re+Im);     /*Rp*/
-          Re=tmp1*Icos*Icos+tmp0*tmp2*tmp2;
-          Rtotal=(Rtotal+(Re-Im)/(Re+Im))*0.5f; /*(Rp+Rs)/2*/
-	  // if(*oldeid==*eid) return Rtotal; /*initial specular reflection*/
-	  if(rand_next_reflect(ran)<=Rtotal){ /*do reflection*/
-              vec_mult_add(pn,c0,-2.f*Icos,1.f,c0);
-              *inout = !(*inout);
-              //if(cfg->debuglevel&dlReflect) MMC_FPRINTF(cfg->flog,"R %f %f %f %d %d %f\n",c0->x,c0->y,c0->z,*eid,*oldeid,Rtotal);
-	  }else if(cfg->isspecular==2 && *eid==0){
-              // if do transmission, but next neighbor is 0, terminate
-          }else{                              /*do transmission*/
-              vec_mult_add(pn,c0,-Icos,1.f,c0);
-              vec_mult_add(pn,c0,tmp2,n1/n2,c0);
-	  }
-       }else{ /*total internal reflection*/
-          vec_mult_add(pn,c0,-2.f*Icos,1.f,c0);
-          *inout = !(*inout);
-       }
-       tmp0=1.f/sqrt(vec_dot(c0,c0));
-       vec_mult(c0,tmp0,c0);
+ //        if(tmp2>0.f){ /*if no total internal reflection*/
+ //          Re=tmp0*Icos*Icos+tmp1*tmp2;      /*transmission angle*/
+	//   tmp2=sqrt(tmp2); /*to save one sqrt*/
+ //          Im=2.f*n1*n2*Icos*tmp2;
+ //          Rtotal=(Re-Im)/(Re+Im);     /*Rp*/
+ //          Re=tmp1*Icos*Icos+tmp0*tmp2*tmp2;
+ //          Rtotal=(Rtotal+(Re-Im)/(Re+Im))*0.5f; /*(Rp+Rs)/2*/
+	//   // if(*oldeid==*eid) return Rtotal; /*initial specular reflection*/
+	//   if(rand_next_reflect(ran)<=Rtotal){ /*do reflection*/
+ //              vec_mult_add(pn,c0,-2.f*Icos,1.f,c0);
+ //              *inout = !(*inout);
+ //              //if(cfg->debuglevel&dlReflect) MMC_FPRINTF(cfg->flog,"R %f %f %f %d %d %f\n",c0->x,c0->y,c0->z,*eid,*oldeid,Rtotal);
+	//   }else if(cfg->isspecular==2 && *eid==0){
+ //              // if do transmission, but next neighbor is 0, terminate
+ //          }else{                              /*do transmission*/
+ //              vec_mult_add(pn,c0,-Icos,1.f,c0);
+ //              vec_mult_add(pn,c0,tmp2,n1/n2,c0);
+	//   }
+ //       }else{ /*total internal reflection*/
+ //          vec_mult_add(pn,c0,-2.f*Icos,1.f,c0);
+ //          *inout = !(*inout);
+ //       }
+ //       tmp0=1.f/sqrt(vec_dot(c0,c0));
+ //       vec_mult(c0,tmp0,c0);
        return 1.f;
 }
 
