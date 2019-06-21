@@ -965,8 +965,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	    int en0, en1, last;
 	    float mus;
 	    if(r->inout){
-	    	// index-1 or not?
-	    	last = sizeof(tracer->mesh->med)/sizeof(tracer->mesh->med[0]);	    	
+	    	last = 2;
 	    	prop = tracer->mesh->med+last;
 	    }else{
 	    	prop=tracer->mesh->med+(tracer->mesh->type[eid]);
@@ -982,14 +981,12 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 
 	    en0 = ee[e2n[r->vesselid][0]]-1;
 	    en1 = ee[e2n[r->vesselid][1]]-1;
-	    // en0 = ee[e2n[r->vesselid[0]][0]]-1;		// get node index, node index starts from 1 in MATLAB but from 0 in C
-	    // en1 = ee[e2n[r->vesselid[0]][1]]-1;
-	    // E0 = _mm_load_ps(&(tracer->mesh->node[en0].x));
-	    // E1 = _mm_load_ps(&(tracer->mesh->node[en1].x));
+
 	    float3 u, E0, E1, OP, PP, Pt, PP0, PP1, fzero = {0.0f, 0.0f, 0.0f};
 	    float norm, normr, st, DIS0, DIS1, pt0[2], pt1[2], theta, ph0[2],ph1[2],Lratio;
 	    E0 = tracer->mesh->node[en0];
 	    E1 = tracer->mesh->node[en1];
+
 	    vec_diff(&E0,&E1,&u);
 	    norm = dist(&E0,&E1);	// get coordinates and compute distance between two nodes
 	    normr = 1/norm;
@@ -1020,10 +1017,8 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	    // update Lmove and reflection
 	    float dx, dy, dr2, drr2, Dt, delta, rt, sgn, xa, xb, ya, yb, Dp;
 	    rt = r->vesselr;
-	    // printf("Radius=%f\n",rt);
-	    if((DIS0>rt+EPS && DIS1<rt-EPS) || (DIS0<rt-EPS && DIS1>rt+EPS))	// hit vessel out->in or in->out
-	    {	
-	    	// printf("DIS0=%f DIS1=%f\n",DIS0,DIS1);
+	    if((DIS0>rt+EPS && DIS1<rt-EPS) || (DIS0<rt-EPS && DIS1>rt+EPS)) 	// hit vessel out->in or in->out
+	    {		    	
 	    	r->isvessel = 1;
 	    	theta = vec_dot(&PP0,&PP1);
 	    	theta = theta/(DIS0*DIS1+EPS);
@@ -1031,7 +1026,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	    	pt0[0] = DIS0;
 		pt0[1] = 0;
 		pt1[0] = DIS1*theta;
-		pt1[1] = DIS1*sqrtf(1-theta*theta);
+		pt1[1] = DIS1*sqrtf(fabs(1-theta*theta));
 	    	dx = pt1[0]-pt0[0];
 	    	dy = pt1[1]-pt0[1];
 	    	dr2 = dx*dx+dy*dy;
@@ -1071,13 +1066,13 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	    }
 	    else if((DIS0<=rt && DIS1>=rt) || (DIS0>rt && DIS1>rt)) {
 	    	r->inout = 0;
-	    	// printf("DIS0=%f DIS1=%f\n",DIS0,DIS1);
+
 	    }
 	    else if((DIS0>=rt && DIS1<=rt) || (DIS0<rt && DIS1<rt)) {
 	    	r->inout = 1;
-	    	// printf("DIS0=%f DIS1=%f\n",DIS0,DIS1);
+
 	    }else{
-	    	// printf("Extra case\n");
+
 	    }
 
             O = _mm_load_ps(&(r->vec.x));
@@ -1265,7 +1260,7 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
         float mom;
 	float kahany, kahant;
 	//	p0          vec                                         pout                    bary0     eid      faceid      isend                      photonid     focus           oldidx          vesselr
-	ray r={cfg->srcpos,{cfg->srcdir.x,cfg->srcdir.y,cfg->srcdir.z},{MMC_UNDEFINED,0.f,0.f},cfg->bary0,cfg->e0,cfg->dim.y-1,0,0,1.f,0.f,0.f,0.f,0.f,0.,0,NULL,NULL,cfg->srcdir.w,0,0xFFFFFFFF,0.0,0,0.f,0,0,{0.f,0.f,0.f},{0.f,0.f,0.f}};
+	ray r={cfg->srcpos,{cfg->srcdir.x,cfg->srcdir.y,cfg->srcdir.z},{MMC_UNDEFINED,0.f,0.f},cfg->bary0,cfg->e0,cfg->dim.y-1,0,0,1.f,0.f,0.f,0.f,0.f,0.,0,NULL,NULL,cfg->srcdir.w,0,0xFFFFFFFF,0.0,0,0.f,0,0,{0.f,0.f,0.f},{0.f,0.f,0.f},0};
 
 	float (*engines[5])(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit)=
 	       {plucker_raytet,havel_raytet,badouel_raytet,branchless_badouel_raytet,branchless_badouel_raytet};
@@ -1318,11 +1313,12 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 #ifdef MMC_USE_SSE
 	const float int_coef_arr[4] = { -1.f, -1.f, -1.f, 1.f };
 	int_coef = _mm_load_ps(int_coef_arr);
-#endif
-	// int count = 0;
+#endif	
 	while(1){  /*propagate a photon until exit*/
+
 	     vid = (int *)(mesh->vessel+(r.eid-1));
 	     r.vesselid = *vid;
+	     // r.vesselid = 2;
 	     vr = (float *)(mesh->radius+(r.eid-1));
 	     r.vesselr = *vr;
 	     // vid = (int *)(mesh->vessel+(r.eid-1)*2);
@@ -1345,16 +1341,15 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	    if(cfg->issavedet && r.Lmove>0.f && mesh->type[r.eid-1]>0 && r.faceid>=0)
 	            r.partialpath[mesh->prop-1+mesh->type[r.eid-1]]+=r.Lmove;  /*second medianum block is the partial path*/
 	    
-	    if(cfg->isreflect && r.isvessel){
-	    	// reflectvessel(mcconfig *cfg,float3 *c0,float3 *u,float3 *ph,float3 *E0,raytracer *tracer,int *eid,int *inout,RandType *ran)
+	    if(cfg->isreflect && r.isvessel && (mesh->med[2].n != mesh->med[mesh->type[r.eid-1]].n)){
 	    	    reflectvessel(cfg,&r.vec,&r.u,&r.p0,&r.E,tracer,&r.eid,&r.inout,ran);
-	    	// printf("count%d\n",count);
-	    	// count++;
+	    	    vec_mult_add(&r.p0,&r.vec,1.0f,10*EPS,&r.p0);
 	    	    continue;
 	    }
 
 	    /*move a photon until the end of the current scattering path*/
 	    while(r.faceid>=0 && !r.isend){
+
 	    	    memcpy((void *)&r.p0,(void *)&r.pout,sizeof(r.p0));
 
 	    	    enb=(int *)(mesh->facenb+(r.eid-1)*mesh->elemlen);
@@ -1390,6 +1385,7 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 
 	    	    vid = (int *)(mesh->vessel+(r.eid-1));
 		    r.vesselid = *vid;
+		    // r.vesselid = 2;
 		    vr = (float *)(mesh->radius+(r.eid-1));
 		    r.vesselr = *vr;
 	    	    // vid = (int *)(mesh->vessel+(r.eid-1)*2);
@@ -1525,59 +1521,64 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 
 float reflectvessel(mcconfig *cfg,float3 *c0,float3 *u,float3 *ph,float3 *E0,raytracer *tracer,int *eid,int *inout,RandType *ran){
 
+	// printf("Before c0x=%f c0y=%f c0z=%f inout=%d\n",c0->x,c0->y,c0->z,*inout);
 	/*to handle refractive index mismatch*/
- //        float3 pnorm={0.f}, *pn=&pnorm, EH, ut;
-	// float Icos,Re,Im,Rtotal,tmp0,tmp1,tmp2,n1,n2;
-	// int last;
+        float3 pnorm={0.f}, *pn=&pnorm, EH, ut;
+	float Icos,Re,Im,Rtotal,tmp0,tmp1,tmp2,n1,n2;
+	int last;
 
-	// vec_diff(E0,ph,&EH);
-	// tmp0 = vec_dot(&EH,u);
-	// vec_mult(u,tmp0,&ut);
-	// vec_diff(&ut,&EH,pn);
-	// tmp0=1.f/sqrt(vec_dot(pn,pn));
-	// vec_mult(pn,tmp0,pn);
+	vec_diff(E0,ph,&EH);
+	tmp0 = vec_dot(&EH,u);
+	vec_mult(u,tmp0,&ut);
+	vec_diff(&ut,&EH,pn);
+	tmp0=1.f/sqrt(vec_dot(pn,pn));
+	vec_mult(pn,tmp0,pn);
 	/*pn pointing outward*/
 
 	// /*compute the cos of the incidence angle*/
- //        Icos=fabs(vec_dot(c0,pn));
+        Icos=fabs(vec_dot(c0,pn));
 
- //        last = sizeof(tracer->mesh->med)/sizeof(tracer->mesh->med[0]);
- //        if(*inout){	// out->in
- //        	n1 = tracer->mesh->med[tracer->mesh->type[*eid-1]].n;
- //        	n2 = tracer->mesh->med[last].n;		
- //        }else{		// in->out
- //        	n1 = tracer->mesh->med[last].n;
-	// 	n2 = tracer->mesh->med[tracer->mesh->type[*eid-1]].n;
- //        }
+        // last = sizeof(tracer->mesh->med)/sizeof(tracer->mesh->med[0]);
+        last = 2;
+        if(*inout){	// out->in
+        	n1 = tracer->mesh->med[tracer->mesh->type[*eid-1]].n;
+        	n2 = tracer->mesh->med[last].n;
+        	// printf("out2in %d: n1=%f, n2=%f\n",*inout,n1,n2);
+        }else{		// in->out
+        	n1 = tracer->mesh->med[last].n;
+		n2 = tracer->mesh->med[tracer->mesh->type[*eid-1]].n;
+		// printf("in2out %d: n1=%f, n2=%f\n",*inout,n1,n2);
+        }
 
-	// tmp0=n1*n1;
-	// tmp1=n2*n2;
- //        tmp2=1.f-tmp0/tmp1*(1.f-Icos*Icos); /*1-[n1/n2*sin(si)]^2 = cos(ti)^2*/
+	tmp0=n1*n1;
+	tmp1=n2*n2;
+        tmp2=1.f-tmp0/tmp1*(1.f-Icos*Icos); /*1-[n1/n2*sin(si)]^2 = cos(ti)^2*/
 
- //        if(tmp2>0.f){ /*if no total internal reflection*/
- //          Re=tmp0*Icos*Icos+tmp1*tmp2;      /*transmission angle*/
-	//   tmp2=sqrt(tmp2); /*to save one sqrt*/
- //          Im=2.f*n1*n2*Icos*tmp2;
- //          Rtotal=(Re-Im)/(Re+Im);     /*Rp*/
- //          Re=tmp1*Icos*Icos+tmp0*tmp2*tmp2;
- //          Rtotal=(Rtotal+(Re-Im)/(Re+Im))*0.5f; /*(Rp+Rs)/2*/
-	//   // if(*oldeid==*eid) return Rtotal; /*initial specular reflection*/
-	//   if(rand_next_reflect(ran)<=Rtotal){ /*do reflection*/
- //              vec_mult_add(pn,c0,-2.f*Icos,1.f,c0);
- //              *inout = !(*inout);
- //              //if(cfg->debuglevel&dlReflect) MMC_FPRINTF(cfg->flog,"R %f %f %f %d %d %f\n",c0->x,c0->y,c0->z,*eid,*oldeid,Rtotal);
-	//   }else if(cfg->isspecular==2 && *eid==0){
- //              // if do transmission, but next neighbor is 0, terminate
- //          }else{                              /*do transmission*/
- //              vec_mult_add(pn,c0,-Icos,1.f,c0);
- //              vec_mult_add(pn,c0,tmp2,n1/n2,c0);
-	//   }
- //       }else{ /*total internal reflection*/
- //          vec_mult_add(pn,c0,-2.f*Icos,1.f,c0);
- //          *inout = !(*inout);
- //       }
- //       tmp0=1.f/sqrt(vec_dot(c0,c0));
- //       vec_mult(c0,tmp0,c0);
+        if(tmp2>0.f){ /*if no total internal reflection*/
+          Re=tmp0*Icos*Icos+tmp1*tmp2;      /*transmission angle*/
+	  tmp2=sqrt(tmp2); /*to save one sqrt*/
+          Im=2.f*n1*n2*Icos*tmp2;
+          Rtotal=(Re-Im)/(Re+Im);     /*Rp*/
+          Re=tmp1*Icos*Icos+tmp0*tmp2*tmp2;
+          Rtotal=(Rtotal+(Re-Im)/(Re+Im))*0.5f; /*(Rp+Rs)/2*/
+	  // if(*oldeid==*eid) return Rtotal; /*initial specular reflection*/
+	  if(rand_next_reflect(ran)<=Rtotal){ /*do reflection*/
+              vec_mult_add(pn,c0,-2.f*Icos,1.f,c0);
+              *inout = !(*inout);
+              //if(cfg->debuglevel&dlReflect) MMC_FPRINTF(cfg->flog,"R %f %f %f %d %d %f\n",c0->x,c0->y,c0->z,*eid,*oldeid,Rtotal);
+	  }else if(cfg->isspecular==2 && *eid==0){
+              // if do transmission, but next neighbor is 0, terminate
+          }else{                              /*do transmission*/
+              vec_mult_add(pn,c0,-Icos,1.f,c0);
+              vec_mult_add(pn,c0,tmp2,n1/n2,c0);
+	  }
+       }else{ /*total internal reflection*/
+          vec_mult_add(pn,c0,-2.f*Icos,1.f,c0);
+          *inout = !(*inout);
+       }
+       tmp0=1.f/sqrt(vec_dot(c0,c0));
+       vec_mult(c0,tmp0,c0);
+       // printf("After c0x=%f c0y=%f c0z=%f inout=%d\n",c0->x,c0->y,c0->z,*inout);
        return 1.f;
 }
 

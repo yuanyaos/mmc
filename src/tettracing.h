@@ -70,6 +70,7 @@ typedef struct MMC_ray{
 	int inout;		      /**< if 1, inside vessel for the NEXT position; if 0, outside vessel */
 	float3 u;		      /**< vessel edge direction */
 	float3 E;		      /**< the starting node of vessel edge */
+	int count;
 } ray;
 
 /***************************************************************************//**

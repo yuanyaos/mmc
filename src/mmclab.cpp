@@ -515,7 +515,7 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
         if(mesh->vessel) free(mesh->vessel);
         mesh->vessel=(int  *)malloc(sizeof(int )*mesh->ne);
         for(i=0;i<mesh->ne;i++)
-           mesh->vessel[i]=val[i];
+           mesh->vessel[i]=val[i]-1;
         printf("mmc.vessel=;\n");
     }
     else if(strcmp(name,"facenb")==0){
