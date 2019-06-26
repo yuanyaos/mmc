@@ -235,6 +235,7 @@ if(~isstruct(cfg))
     error('cfg must be a struct or struct array');
 end
 
+reorient=[0 2 1 4 3 5];
 len=length(cfg);
 for i=1:len
     if(~isfield(cfg(i),'node') || ~isfield(cfg(i),'elem'))
@@ -244,7 +245,8 @@ for i=1:len
         cfg(i).elemprop=cfg(i).elem(:,5);
     end
     if(~isfield(cfg(i),'isreoriented') || isempty(cfg(i).isreoriented) || cfg(i).isreoriented==0)
-        cfg(i).elem=meshreorient(cfg(i).node,cfg(i).elem(:,1:4));
+        [cfg(i).elem,~,idx]=meshreorient(cfg(i).node,cfg(i).elem(:,1:4));
+        cfg.vessel(idx,:) = reorient(cfg.vessel(idx,:)+1);
         cfg(i).isreoriented=1;
     end
     if(~isfield(cfg(i),'facenb') || isempty(cfg(i).facenb))
@@ -295,7 +297,8 @@ for i=1:len
             end
             [cfg(i).node,cfg(i).elem] = mmcaddsrc(cfg(i).node,cfg(i).elem,sdom);
             cfg(i).elemprop=cfg(i).elem(:,5);
-            cfg(i).elem=meshreorient(cfg(i).node,cfg(i).elem(:,1:4));
+            [cfg(i).elem,~,idx]=meshreorient(cfg(i).node,cfg(i).elem(:,1:4));
+            cfg.vessel(idx,:) = reorient(cfg.vessel(idx,:)+1);
             cfg(i).facenb=faceneighbors(cfg(i).elem);
             cfg(i).evol=elemvolume(cfg(i).node,cfg(i).elem);
             cfg(i).isreoriented=1;

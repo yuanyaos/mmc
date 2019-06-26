@@ -981,7 +981,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 
 	    en0 = ee[e2n[r->vesselid][0]]-1;
 	    en1 = ee[e2n[r->vesselid][1]]-1;
-
+	    
 	    float3 u, E0, E1, OP, PP, Pt, PP0, PP1, fzero = {0.0f, 0.0f, 0.0f};
 	    float norm, normr, st, DIS0, DIS1, pt0[2], pt1[2], theta, ph0[2],ph1[2],Lratio;
 	    E0 = tracer->mesh->node[en0];

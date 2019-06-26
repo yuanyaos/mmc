@@ -16,11 +16,11 @@ cfg.nphoton=1e7;
 [cfg.node,cfg.elem] = meshgrid6(0:1,0:1,0:1);
 cfg.node = cfg.node*60;
 cfg.elemprop=ones(size(cfg.elem,1),1);
-cfg.vessel = 3*ones(size(cfg.elem,1),1);
-cfg.radius = 3*ones(size(cfg.elem,1),1);
+cfg.vessel = 2*ones(size(cfg.elem,1),1);
+cfg.radius = 2*ones(size(cfg.elem,1),1);
 cfg.srcpos=[35 25 0];
 cfg.srcdir=[0 0 1];
-cfg.prop=[0 0 1 1;0.005 1 0 1.37;0.005 1 0 13.7];
+cfg.prop=[0 0 1 1;0.005 1 0 1.37;0.5 1 0 1.37];
 cfg.tstart=0;
 cfg.tend=5e-9;
 cfg.tstep=5e-9;
@@ -37,6 +37,8 @@ flux=mmclab(cfg);
 
 % plot the cross-section of the fluence
 figure,slice3(log10(flux.data))
+colormap jet
+
 figure,imagesc((log10(squeeze(flux.data(:,30,:)))))
 
 figure
