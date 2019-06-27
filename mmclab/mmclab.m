@@ -235,7 +235,7 @@ if(~isstruct(cfg))
     error('cfg must be a struct or struct array');
 end
 
-reorient=[0 2 1 4 3 5];
+reorient=[0 2 1 4 3 5 6];
 len=length(cfg);
 for i=1:len
     if(~isfield(cfg(i),'node') || ~isfield(cfg(i),'elem'))

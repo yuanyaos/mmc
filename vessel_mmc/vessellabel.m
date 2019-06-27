@@ -45,7 +45,7 @@ end
 
 % map from local node index to local edge index
 n2e = {'0  1', '0  2', '0  3', '1  2', '1  3', '2  3'};
-vessel = zeros(size(elem,1),1);
+vessel = 6*ones(size(elem,1),1);
 [elempath,ie,~] = unique(elempath);
 nodelocalindex = nodelocalindex(ie,:);
 for i=1:size(nodelocalindex,1)

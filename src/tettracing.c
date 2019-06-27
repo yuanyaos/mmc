@@ -962,14 +962,17 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	if(r->faceid>=0 && bary.x>=0){
 	    medium *prop;
 	    int *enb, *ee=(int *)(tracer->mesh->elem+eid*tracer->mesh->elemlen);
-	    int en0, en1, last;
+	    int last;
 	    float mus;
 	    if(r->inout){
-	    	last = 2;
-	    	prop = tracer->mesh->med+last;
+	    	last=2;
+	    	prop=tracer->mesh->med+last;
 	    }else{
 	    	prop=tracer->mesh->med+(tracer->mesh->type[eid]);
 	    }
+	    if(r->vesselid>5)
+	    	prop=tracer->mesh->med+(tracer->mesh->type[eid]);
+
 	    rc=prop->n*R_C0;
             currweight=r->weight;
             mus=(cfg->mcmethod==mmMCX) ? prop->mus : (prop->mua+prop->mus);
@@ -979,101 +982,105 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
             	    _mm_prefetch((char *)&(tracer->n[(r->nexteid-1)<<2].x),_MM_HINT_T0);
 	    }
 
-	    en0 = ee[e2n[r->vesselid][0]]-1;
-	    en1 = ee[e2n[r->vesselid][1]]-1;
-	    
-	    float3 u, E0, E1, OP, PP, Pt, PP0, PP1, fzero = {0.0f, 0.0f, 0.0f};
-	    float norm, normr, st, DIS0, DIS1, pt0[2], pt1[2], theta, ph0[2],ph1[2],Lratio;
-	    E0 = tracer->mesh->node[en0];
-	    E1 = tracer->mesh->node[en1];
-
-	    vec_diff(&E0,&E1,&u);
-	    norm = dist(&E0,&E1);	// get coordinates and compute distance between two nodes
-	    normr = 1/norm;
-	    vec_mult(&u,normr,&u);	// normal vector of the edge
-	    r->u = u;
-	    r->E = E0;
-
 	    dlen=(mus <= EPS) ? R_MIN_MUS : r->slen/mus;
 	    Lp0=bary.x;
 	    r->isend=(Lp0>dlen);
 	    r->Lmove=((r->isend) ? dlen : Lp0);
 
-	    PP = r->p0;				// P0
-	    vec_diff(&E0,&PP,&OP);
-	    st = vec_dot(&OP,&u);
-	    vec_mult(&u,st,&Pt);
-	    vec_diff(&Pt,&OP,&PP0);		// PP0: P0 projection on plane
-	    DIS0 = dist(&PP0,&fzero);
+	    if(r->vesselid<6){	// vesselid==6: there is no edge labeled as vessel in the current element
+		float3 u, E0, E1, OP, PP, Pt, PP0, PP1;
+		float norm, normr, st, DIS0, DIS1, pt0[2], pt1[2], theta, ph0[2],ph1[2],Lratio;
+		int en0, en1;
 
-	    vec_mult(&r->vec,r->Lmove,&PP);
-	    vec_add(&r->p0,&PP,&PP);		// P1
-	    vec_diff(&E0,&PP,&OP);
-	    st = vec_dot(&OP,&u);
-	    vec_mult(&u,st,&Pt);
-	    vec_diff(&Pt,&OP,&PP1);		// PP1: P1 projection on plane
-	    DIS1 = dist(&PP1,&fzero);
+		en0 = ee[e2n[r->vesselid][0]]-1;
+		en1 = ee[e2n[r->vesselid][1]]-1;
+		E0 = tracer->mesh->node[en0];
+		E1 = tracer->mesh->node[en1];
 
-	    // update Lmove and reflection
-	    float dx, dy, dr2, drr2, Dt, delta, rt, sgn, xa, xb, ya, yb, Dp;
-	    rt = r->vesselr;
-	    if((DIS0>rt+EPS && DIS1<rt-EPS) || (DIS0<rt-EPS && DIS1>rt+EPS)) 	// hit vessel out->in or in->out
-	    {		    	
-	    	r->isvessel = 1;
-	    	theta = vec_dot(&PP0,&PP1);
-	    	theta = theta/(DIS0*DIS1+EPS);
+		vec_diff(&E0,&E1,&u);
+		norm = dist(&E0,&E1);	// get coordinates and compute distance between two nodes
+		normr = 1/norm;
+		vec_mult(&u,normr,&u);	// normal vector of the edge
+		r->u = u;
+		r->E = E0;
 
-	    	pt0[0] = DIS0;
-		pt0[1] = 0;
-		pt1[0] = DIS1*theta;
-		pt1[1] = DIS1*sqrtf(fabs(1-theta*theta));
-	    	dx = pt1[0]-pt0[0];
-	    	dy = pt1[1]-pt0[1];
-	    	dr2 = dx*dx+dy*dy;
-	    	drr2 = 1/dr2;
-	    	Dt = pt0[0]*pt1[1];
-	    	delta = sqrtf(rt*rt*dr2-Dt*Dt);	// must be >0
-	    	sgn = (dy>=0) ? 1.0f : -1.0f;
-	    	xa = Dt*dy*drr2;
-	    	xb = sgn*dx*delta*drr2;
-	    	ya = -Dt*dx*drr2;
-	    	yb = fabs(dy)*delta*drr2;
-	    	ph0[0] = xa+xb;
-	    	ph0[1] = ya+yb;
-	    	ph1[0] = xa-xb;
-	    	ph1[1] = ya-yb;
-	    	Dp = (pt1[0]-pt0[0])*(pt1[0]-pt0[0])+(pt1[1]-pt0[1])*(pt1[1]-pt0[1]);
-	    	if(DIS0>rt && DIS1<rt){		// out->in
-	    		r->inout = 1;
-	    		Lratio = (ph1[0]-pt0[0])*(ph1[0]-pt0[0])+(ph1[1]-pt0[1])*(ph1[1]-pt0[1]);	    	
-	    		if(Dp>Lratio){
-	    			Lratio = sqrtf(Lratio/Dp);
-	    		}else{
-	    			Lratio = (ph0[0]-pt0[0])*(ph0[0]-pt0[0])+(ph0[1]-pt0[1])*(ph0[1]-pt0[1]);
-	    			Lratio = sqrtf(Lratio/Dp);
-	    		}
-	    	}else{	// DIS0<rt && DIS1>rt, in->out
-	    		r->inout = 0;
-	    		Lratio = (ph1[0]-pt1[0])*(ph1[0]-pt1[0])+(ph1[1]-pt1[1])*(ph1[1]-pt1[1]);	    	
-	    		if(Dp>Lratio){
-	    			Lratio = 1-sqrtf(Lratio/Dp);
-	    		}else{
-	    			Lratio = (ph0[0]-pt1[0])*(ph0[0]-pt1[0])+(ph0[1]-pt1[1])*(ph0[1]-pt1[1]);
-	    			Lratio = 1-sqrtf(Lratio/Dp);
-	    		}
-	    	}
-	    	r->Lmove = r->Lmove*Lratio;
-	    }
-	    else if((DIS0<=rt && DIS1>=rt) || (DIS0>rt && DIS1>rt)) {
-	    	r->inout = 0;
+		PP = r->p0;				// P0
+		vec_diff(&E0,&PP,&OP);
+		st = vec_dot(&OP,&u);
+		vec_mult(&u,st,&Pt);
+		vec_diff(&Pt,&OP,&PP0);		// PP0: P0 projection on plane
+		DIS0 = sqrtf(PP0.x*PP0.x+PP0.y*PP0.y+PP0.z*PP0.z);
 
-	    }
-	    else if((DIS0>=rt && DIS1<=rt) || (DIS0<rt && DIS1<rt)) {
-	    	r->inout = 1;
+		vec_mult(&r->vec,r->Lmove,&PP);
+		vec_add(&r->p0,&PP,&PP);		// P1
+		vec_diff(&E0,&PP,&OP);
+		st = vec_dot(&OP,&u);
+		vec_mult(&u,st,&Pt);
+		vec_diff(&Pt,&OP,&PP1);		// PP1: P1 projection on plane
+		DIS1 = sqrtf(PP1.x*PP1.x+PP1.y*PP1.y+PP1.z*PP1.z);
 
+		// update Lmove and reflection
+		float dx, dy, dr2, drr2, Dt, delta, rt, sgn, xa, xb, ya, yb, Dp;
+		rt = r->vesselr;
+		if((DIS0>rt+EPS && DIS1<rt-EPS) || (DIS0<rt-EPS && DIS1>rt+EPS)) 	// hit vessel out->in or in->out
+		{		    	
+			r->isvessel = 1;
+			theta = vec_dot(&PP0,&PP1);
+			theta = theta/(DIS0*DIS1+EPS);
+
+			pt0[0] = DIS0;
+			pt0[1] = 0;
+			pt1[0] = DIS1*theta;
+			pt1[1] = DIS1*sqrtf(fabs(1-theta*theta));
+			dx = pt1[0]-pt0[0];
+			dy = pt1[1]-pt0[1];
+			dr2 = dx*dx+dy*dy;
+			drr2 = 1/dr2;
+			Dt = pt0[0]*pt1[1];
+			delta = sqrtf(rt*rt*dr2-Dt*Dt);	// must be >0
+			sgn = (dy>=0) ? 1.0f : -1.0f;
+			xa = Dt*dy*drr2;
+			xb = sgn*dx*delta*drr2;
+			ya = -Dt*dx*drr2;
+			yb = fabs(dy)*delta*drr2;
+			ph0[0] = xa+xb;
+			ph0[1] = ya+yb;
+			ph1[0] = xa-xb;
+			ph1[1] = ya-yb;
+			Dp = (pt1[0]-pt0[0])*(pt1[0]-pt0[0])+(pt1[1]-pt0[1])*(pt1[1]-pt0[1]);
+			if(DIS0>rt && DIS1<rt){		// out->in
+				r->inout = 1;
+				Lratio = (ph1[0]-pt0[0])*(ph1[0]-pt0[0])+(ph1[1]-pt0[1])*(ph1[1]-pt0[1]);	    	
+				if(Dp>Lratio){
+					Lratio = sqrtf(Lratio/Dp);
+				}else{
+					Lratio = (ph0[0]-pt0[0])*(ph0[0]-pt0[0])+(ph0[1]-pt0[1])*(ph0[1]-pt0[1]);
+					Lratio = sqrtf(Lratio/Dp);
+				}
+			}else{	// DIS0<rt && DIS1>rt, in->out
+				r->inout = 0;
+				Lratio = (ph1[0]-pt1[0])*(ph1[0]-pt1[0])+(ph1[1]-pt1[1])*(ph1[1]-pt1[1]);	    	
+				if(Dp>Lratio){
+					Lratio = 1-sqrtf(Lratio/Dp);
+				}else{
+					Lratio = (ph0[0]-pt1[0])*(ph0[0]-pt1[0])+(ph0[1]-pt1[1])*(ph0[1]-pt1[1]);
+					Lratio = 1-sqrtf(Lratio/Dp);
+				}
+			}
+			r->Lmove = r->Lmove*Lratio;
+		}
+		else if((DIS0<=rt && DIS1>=rt) || (DIS0>rt && DIS1>rt)) {
+			r->inout = 0;
+		}
+		else if((DIS0>=rt && DIS1<=rt) || (DIS0<rt && DIS1<rt)) {
+			r->inout = 1;
+		}else{
+
+		}
 	    }else{
-
+	    	r->inout = 0;
 	    }
+	    
 
             O = _mm_load_ps(&(r->vec.x));
 	    S = _mm_load_ps(&(r->p0.x));
