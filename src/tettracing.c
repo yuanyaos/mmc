@@ -989,7 +989,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 
 	    if(r->vesselid<6){	// vesselid==6: there is no edge labeled as vessel in the current element
 		float3 u, E0, E1, OP, PP, Pt, PP0, PP1;
-		float norm, normr, st, DIS0, DIS1, pt0[2], pt1[2], theta, ph0[2],ph1[2],Lratio;
+		float norm, normr, st, DIS0, DIS1, pt0[2], pt1[2], theta, Lratio;
 		int en0, en1;
 
 		en0 = ee[e2n[r->vesselid][0]]-1;
@@ -1020,14 +1020,47 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 		DIS1 = sqrtf(PP1.x*PP1.x+PP1.y*PP1.y+PP1.z*PP1.z);
 
 		// update Lmove and reflection
-		float dx, dy, dr2, drr2, Dt, delta, rt, sgn, xa, xb, ya, yb, Dp;
+		float dx, dy, dr2, drr2, Dt, delta, rt, sgn, xa, xb, ya, yb, Dp, ph0[2],ph1[2];	// Analytical Solution
+		// float rt, ps, Dc, Dp,t1,t2,Dtemp;
+		// int flag = 0;
 		rt = r->vesselr;
 		if((DIS0>rt+EPS && DIS1<rt-EPS) || (DIS0<rt-EPS && DIS1>rt+EPS)) 	// hit vessel out->in or in->out
-		{		    	
+		{
 			r->isvessel = 1;
 			theta = vec_dot(&PP0,&PP1);
-			theta = theta/(DIS0*DIS1+EPS);
+			theta = theta/(DIS0*DIS1+EPS);			
 
+			// /* Geometric Solution */
+			// if(DIS0>rt+EPS && DIS1<rt-EPS){
+			// 	pt0[0] = DIS0;
+			// 	pt0[1] = 0;
+			// 	pt1[0] = DIS1*theta;
+			// 	pt1[1] = DIS1*sqrtf(fabs(1-theta*theta));
+			// 	Dc = DIS0;
+			// 	flag = 1;
+			// }else{	// DIS0<rt-EPS && DIS1>rt+EPS
+			// 	pt1[0] = DIS0;
+			// 	pt1[1] = 0;
+			// 	pt0[0] = DIS1*theta;
+			// 	pt0[1] = DIS1*sqrtf(fabs(1-theta*theta));
+			// 	Dc = DIS1;
+			// 	flag = 0;
+			// }
+			// t1 = pt1[0]-pt0[0];
+			// t2 = pt1[1]-pt0[1];
+			// Dp = sqrtf(t1*t1+t2*t2);
+			// ps = (-pt0[0]*t1-pt0[1]*t2)/Dp;
+			// Dtemp = ps-sqrtf(rt*rt-Dc*Dc+ps*ps);
+			// if(flag){
+			// 	r->inout = 1;
+			// 	Lratio = Dtemp/Dp;
+			// }else{
+			// 	r->inout = 0;
+			// 	Lratio = 1-Dtemp/Dp;
+			// }
+			
+
+			/* Analytical Solution */
 			pt0[0] = DIS0;
 			pt0[1] = 0;
 			pt1[0] = DIS1*theta;
@@ -1067,6 +1100,9 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 					Lratio = 1-sqrtf(Lratio/Dp);
 				}
 			}
+
+			if(Lratio<0 || Lratio>1)
+				printf("ERROR\n");
 			r->Lmove = r->Lmove*Lratio;
 		}
 		else if((DIS0<=rt && DIS1>=rt) || (DIS0>rt && DIS1>rt)) {
