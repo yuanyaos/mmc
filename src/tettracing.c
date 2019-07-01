@@ -1009,7 +1009,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 		st = vec_dot(&OP,&u);
 		vec_mult(&u,st,&Pt);
 		vec_diff(&Pt,&OP,&PP0);		// PP0: P0 projection on plane
-		DIS0 = sqrtf(PP0.x*PP0.x+PP0.y*PP0.y+PP0.z*PP0.z);
+		DIS0 = PP0.x*PP0.x+PP0.y*PP0.y+PP0.z*PP0.z;
 
 		vec_mult(&r->vec,r->Lmove,&PP);
 		vec_add(&r->p0,&PP,&PP);		// P1
@@ -1017,14 +1017,17 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 		st = vec_dot(&OP,&u);
 		vec_mult(&u,st,&Pt);
 		vec_diff(&Pt,&OP,&PP1);		// PP1: P1 projection on plane
-		DIS1 = sqrtf(PP1.x*PP1.x+PP1.y*PP1.y+PP1.z*PP1.z);
+		DIS1 = PP1.x*PP1.x+PP1.y*PP1.y+PP1.z*PP1.z;
 
 		// update Lmove and reflection
-		float dx, dy, dr2, drr2, Dt, delta, rt, sgn, xa, xb, ya, yb, Dp;
+		float dx, dy, dr2, drr2, Dt, delta, rt, rt2, sgn, xa, xb, ya, yb, Dp;
 		rt = r->vesselr;
-		if((DIS0>rt+EPS && DIS1<rt-EPS) || (DIS0<rt-EPS && DIS1>rt+EPS)) 	// hit vessel out->in or in->out
+		rt2 = rt*rt;
+		if((DIS0>rt2+10*EPS && DIS1<rt2-10*EPS) || (DIS0<rt2-10*EPS && DIS1>rt2+10*EPS)) 	// hit vessel out->in or in->out
 		{		    	
 			r->isvessel = 1;
+			DIS0 = sqrtf(DIS0);
+			DIS1 = sqrtf(DIS1);
 			theta = vec_dot(&PP0,&PP1);
 			theta = theta/(DIS0*DIS1+EPS);
 
@@ -1069,10 +1072,10 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 			}
 			r->Lmove = r->Lmove*Lratio;
 		}
-		else if((DIS0<=rt && DIS1>=rt) || (DIS0>rt && DIS1>rt)) {
+		else if((DIS0<=rt2 && DIS1>=rt2) || (DIS0>rt2 && DIS1>rt2)) {
 			r->inout = 0;
 		}
-		else if((DIS0>=rt && DIS1<=rt) || (DIS0<rt && DIS1<rt)) {
+		else if((DIS0>=rt2 && DIS1<=rt2) || (DIS0<rt2 && DIS1<rt2)) {
 			r->inout = 1;
 		}else{
 
