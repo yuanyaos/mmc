@@ -1009,7 +1009,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 		st = vec_dot(&OP,&u);
 		vec_mult(&u,st,&Pt);
 		vec_diff(&Pt,&OP,&PP0);		// PP0: P0 projection on plane
-		DIS0 = sqrtf(PP0.x*PP0.x+PP0.y*PP0.y+PP0.z*PP0.z);
+		DIS0 = PP0.x*PP0.x+PP0.y*PP0.y+PP0.z*PP0.z;
 
 		vec_mult(&r->vec,r->Lmove,&PP);
 		vec_add(&r->p0,&PP,&PP);		// P1
@@ -1017,98 +1017,102 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 		st = vec_dot(&OP,&u);
 		vec_mult(&u,st,&Pt);
 		vec_diff(&Pt,&OP,&PP1);		// PP1: P1 projection on plane
-		DIS1 = sqrtf(PP1.x*PP1.x+PP1.y*PP1.y+PP1.z*PP1.z);
+		DIS1 = PP1.x*PP1.x+PP1.y*PP1.y+PP1.z*PP1.z;
 
 		// update Lmove and reflection
-		float dx, dy, dr2, drr2, Dt, delta, rt, sgn, xa, xb, ya, yb, Dp, ph0[2],ph1[2];	// Analytical Solution
-		// float rt, ps, Dc, Dp,t1,t2,Dtemp;
-		// int flag = 0;
+		// float dx, dy, dr2, drr2, Dt, delta, rt, rt2, sgn, xa, xb, ya, yb, Dp, ph0[2],ph1[2];	// Analytical Solution
+		float rt, rt2, ps, Dc, Dp,t1,t2,Dtemp;	// Geometric Solution
+		int flag = 0;
 		rt = r->vesselr;
-		if((DIS0>rt+EPS && DIS1<rt-EPS) || (DIS0<rt-EPS && DIS1>rt+EPS)) 	// hit vessel out->in or in->out
+		rt2 = rt*rt;
+		if((DIS0>rt2+10*EPS && DIS1<rt2-10*EPS) || (DIS0<rt2-10*EPS && DIS1>rt2+10*EPS)) 	// hit vessel out->in or in->out
 		{
 			r->isvessel = 1;
+			DIS0 = sqrtf(DIS0);
+			DIS1 = sqrtf(DIS1);
 			theta = vec_dot(&PP0,&PP1);
-			theta = theta/(DIS0*DIS1+EPS);			
+			theta = theta/(DIS0*DIS1+EPS);
 
-			// /* Geometric Solution */
-			// if(DIS0>rt+EPS && DIS1<rt-EPS){
-			// 	pt0[0] = DIS0;
-			// 	pt0[1] = 0;
-			// 	pt1[0] = DIS1*theta;
-			// 	pt1[1] = DIS1*sqrtf(fabs(1-theta*theta));
-			// 	Dc = DIS0;
-			// 	flag = 1;
-			// }else{	// DIS0<rt-EPS && DIS1>rt+EPS
-			// 	pt1[0] = DIS0;
-			// 	pt1[1] = 0;
-			// 	pt0[0] = DIS1*theta;
-			// 	pt0[1] = DIS1*sqrtf(fabs(1-theta*theta));
-			// 	Dc = DIS1;
-			// 	flag = 0;
-			// }
-			// t1 = pt1[0]-pt0[0];
-			// t2 = pt1[1]-pt0[1];
-			// Dp = sqrtf(t1*t1+t2*t2);
-			// ps = (-pt0[0]*t1-pt0[1]*t2)/Dp;
-			// Dtemp = ps-sqrtf(rt*rt-Dc*Dc+ps*ps);
-			// if(flag){
-			// 	r->inout = 1;
-			// 	Lratio = Dtemp/Dp;
-			// }else{
-			// 	r->inout = 0;
-			// 	Lratio = 1-Dtemp/Dp;
-			// }
-			
-
-			/* Analytical Solution */
-			pt0[0] = DIS0;
-			pt0[1] = 0;
-			pt1[0] = DIS1*theta;
-			pt1[1] = DIS1*sqrtf(fabs(1-theta*theta));
-			dx = pt1[0]-pt0[0];
-			dy = pt1[1]-pt0[1];
-			dr2 = dx*dx+dy*dy;
-			drr2 = 1/dr2;
-			Dt = pt0[0]*pt1[1];
-			delta = sqrtf(rt*rt*dr2-Dt*Dt);	// must be >0
-			sgn = (dy>=0) ? 1.0f : -1.0f;
-			xa = Dt*dy*drr2;
-			xb = sgn*dx*delta*drr2;
-			ya = -Dt*dx*drr2;
-			yb = fabs(dy)*delta*drr2;
-			ph0[0] = xa+xb;
-			ph0[1] = ya+yb;
-			ph1[0] = xa-xb;
-			ph1[1] = ya-yb;
-			Dp = (pt1[0]-pt0[0])*(pt1[0]-pt0[0])+(pt1[1]-pt0[1])*(pt1[1]-pt0[1]);
-			if(DIS0>rt && DIS1<rt){		// out->in
+			/* Geometric Solution */
+			if(DIS0>rt && DIS1<rt){
+				pt0[0] = DIS0;
+				pt0[1] = 0;
+				pt1[0] = DIS1*theta;
+				pt1[1] = DIS1*sqrtf(fabs(1-theta*theta));
+				Dc = DIS0;
+				flag = 1;
+			}else{	// DIS0<rt-EPS && DIS1>rt+EPS
+				pt1[0] = DIS0;
+				pt1[1] = 0;
+				pt0[0] = DIS1*theta;
+				pt0[1] = DIS1*sqrtf(fabs(1-theta*theta));
+				Dc = DIS1;
+				flag = 0;
+			}
+			t1 = pt1[0]-pt0[0];
+			t2 = pt1[1]-pt0[1];
+			Dp = sqrtf(t1*t1+t2*t2);
+			ps = (-pt0[0]*t1-pt0[1]*t2)/Dp;
+			Dtemp = ps-sqrtf(rt*rt-Dc*Dc+ps*ps);
+			if(flag){
 				r->inout = 1;
-				Lratio = (ph1[0]-pt0[0])*(ph1[0]-pt0[0])+(ph1[1]-pt0[1])*(ph1[1]-pt0[1]);	    	
-				if(Dp>Lratio){
-					Lratio = sqrtf(Lratio/Dp);
-				}else{
-					Lratio = (ph0[0]-pt0[0])*(ph0[0]-pt0[0])+(ph0[1]-pt0[1])*(ph0[1]-pt0[1]);
-					Lratio = sqrtf(Lratio/Dp);
-				}
-			}else{	// DIS0<rt && DIS1>rt, in->out
+				Lratio = Dtemp/Dp;
+			}else{
 				r->inout = 0;
-				Lratio = (ph1[0]-pt1[0])*(ph1[0]-pt1[0])+(ph1[1]-pt1[1])*(ph1[1]-pt1[1]);	    	
-				if(Dp>Lratio){
-					Lratio = 1-sqrtf(Lratio/Dp);
-				}else{
-					Lratio = (ph0[0]-pt1[0])*(ph0[0]-pt1[0])+(ph0[1]-pt1[1])*(ph0[1]-pt1[1]);
-					Lratio = 1-sqrtf(Lratio/Dp);
-				}
+				Lratio = 1-Dtemp/Dp;
 			}
 
-			if(Lratio<0 || Lratio>1)
-				printf("ERROR\n");
+			// if(Lratio<0 || Lratio>1){				
+			// 	printf("Dtemp=%f,Dp=%f,Lratio=%f\n",Dtemp,Dp,Lratio);
+			// }
+
+			/* Analytical Solution */
+			// pt0[0] = DIS0;
+			// pt0[1] = 0;
+			// pt1[0] = DIS1*theta;
+			// pt1[1] = DIS1*sqrtf(fabs(1-theta*theta));
+			// dx = pt1[0]-pt0[0];
+			// dy = pt1[1]-pt0[1];
+			// dr2 = dx*dx+dy*dy;
+			// drr2 = 1/dr2;
+			// Dt = pt0[0]*pt1[1];
+			// delta = sqrtf(rt*rt*dr2-Dt*Dt);	// must be >0
+			// sgn = (dy>=0) ? 1.0f : -1.0f;
+			// xa = Dt*dy*drr2;
+			// xb = sgn*dx*delta*drr2;
+			// ya = -Dt*dx*drr2;
+			// yb = fabs(dy)*delta*drr2;
+			// ph0[0] = xa+xb;
+			// ph0[1] = ya+yb;
+			// ph1[0] = xa-xb;
+			// ph1[1] = ya-yb;
+			// Dp = (pt1[0]-pt0[0])*(pt1[0]-pt0[0])+(pt1[1]-pt0[1])*(pt1[1]-pt0[1]);
+			// if(DIS0>rt && DIS1<rt){		// out->in
+			// 	r->inout = 1;
+			// 	Lratio = (ph1[0]-pt0[0])*(ph1[0]-pt0[0])+(ph1[1]-pt0[1])*(ph1[1]-pt0[1]);	    	
+			// 	if(Dp>Lratio){
+			// 		Lratio = sqrtf(Lratio/Dp);
+			// 	}else{
+			// 		Lratio = (ph0[0]-pt0[0])*(ph0[0]-pt0[0])+(ph0[1]-pt0[1])*(ph0[1]-pt0[1]);
+			// 		Lratio = sqrtf(Lratio/Dp);
+			// 	}
+			// }else{	// DIS0<rt && DIS1>rt, in->out
+			// 	r->inout = 0;
+			// 	Lratio = (ph1[0]-pt1[0])*(ph1[0]-pt1[0])+(ph1[1]-pt1[1])*(ph1[1]-pt1[1]);	    	
+			// 	if(Dp>Lratio){
+			// 		Lratio = 1-sqrtf(Lratio/Dp);
+			// 	}else{
+			// 		Lratio = (ph0[0]-pt1[0])*(ph0[0]-pt1[0])+(ph0[1]-pt1[1])*(ph0[1]-pt1[1]);
+			// 		Lratio = 1-sqrtf(Lratio/Dp);
+			// 	}
+			// }
+			
 			r->Lmove = r->Lmove*Lratio;
 		}
-		else if((DIS0<=rt && DIS1>=rt) || (DIS0>rt && DIS1>rt)) {
+		else if((DIS0<=rt2 && DIS1>=rt2) || (DIS0>rt2 && DIS1>rt2)) {
 			r->inout = 0;
 		}
-		else if((DIS0>=rt && DIS1<=rt) || (DIS0<rt && DIS1<rt)) {
+		else if((DIS0>=rt2 && DIS1<=rt2) || (DIS0<rt2 && DIS1<rt2)) {
 			r->inout = 1;
 		}else{
 
