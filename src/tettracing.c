@@ -892,6 +892,102 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 }
 #endif  /* #if !defined(__EMSCRIPTEN__) */
 
+// ray_cylinder_intersect(r, tracer, ee, 0);
+float ray_cylinder_intersect(ray *r, raytracer *tracer, int *ee, int index){
+	float3 u, E0, E1, OP, PP, Pt, PP0, PP1;
+	float norm, normr, st, DIS0, DIS1, pt0[2], pt1[2], theta, ph0[2], ph1[2], Lratio;
+	int en0, en1;
+
+	en0 = ee[e2n[r->vesselid[index]][0]]-1;
+	en1 = ee[e2n[r->vesselid[index]][1]]-1;
+	E0 = tracer->mesh->node[en0];
+	E1 = tracer->mesh->node[en1];
+
+	vec_diff(&E0,&E1,&u);
+	norm = dist(&E0,&E1);	// get coordinates and compute distance between two nodes
+	normr = 1/norm;
+	vec_mult(&u,normr,&u);	// normal vector of the edge
+	r->u = u;
+	r->E = E0;
+
+	PP = r->p0;				// P0
+	vec_diff(&E0,&PP,&OP);
+	st = vec_dot(&OP,&u);
+	vec_mult(&u,st,&Pt);
+	vec_diff(&Pt,&OP,&PP0);		// PP0: P0 projection on plane
+	DIS0 = PP0.x*PP0.x+PP0.y*PP0.y+PP0.z*PP0.z;
+
+	vec_mult(&r->vec,r->Lmove,&PP);
+	vec_add(&r->p0,&PP,&PP);		// P1
+	vec_diff(&E0,&PP,&OP);
+	st = vec_dot(&OP,&u);
+	vec_mult(&u,st,&Pt);
+	vec_diff(&Pt,&OP,&PP1);		// PP1: P1 projection on plane
+	DIS1 = PP1.x*PP1.x+PP1.y*PP1.y+PP1.z*PP1.z;
+
+	// update Lmove and reflection
+	float dx, dy, dr2, drr2, Dt, delta, rt, rt2, sgn, xa, xb, ya, yb, Dp;
+	rt = r->vesselr[index];
+	rt2 = rt*rt;
+	if((DIS0>rt2+10*EPS && DIS1<rt2-10*EPS) || (DIS0<rt2-10*EPS && DIS1>rt2+10*EPS)) 	// hit vessel out->in or in->out
+	{		    	
+		r->isvessel = 1;
+		DIS0 = sqrtf(DIS0);
+		DIS1 = sqrtf(DIS1);
+		theta = vec_dot(&PP0,&PP1);
+		theta = theta/(DIS0*DIS1+EPS);
+
+		pt0[0] = DIS0;
+		pt0[1] = 0;
+		pt1[0] = DIS1*theta;
+		pt1[1] = DIS1*sqrtf(fabs(1-theta*theta));
+		dx = pt1[0]-pt0[0];
+		dy = pt1[1]-pt0[1];
+		dr2 = dx*dx+dy*dy;
+		drr2 = 1/dr2;
+		Dt = pt0[0]*pt1[1];
+		delta = sqrtf(rt*rt*dr2-Dt*Dt);	// must be >0
+		sgn = (dy>=0) ? 1.0f : -1.0f;
+		xa = Dt*dy*drr2;
+		xb = sgn*dx*delta*drr2;
+		ya = -Dt*dx*drr2;
+		yb = fabs(dy)*delta*drr2;
+		ph0[0] = xa+xb;
+		ph0[1] = ya+yb;
+		ph1[0] = xa-xb;
+		ph1[1] = ya-yb;
+		Dp = (pt1[0]-pt0[0])*(pt1[0]-pt0[0])+(pt1[1]-pt0[1])*(pt1[1]-pt0[1]);
+		if(DIS0>rt && DIS1<rt){		// out->in
+			r->inout = 1;
+			Lratio = (ph1[0]-pt0[0])*(ph1[0]-pt0[0])+(ph1[1]-pt0[1])*(ph1[1]-pt0[1]);	    	
+			if(Dp>Lratio){
+				Lratio = sqrtf(Lratio/Dp);
+			}else{
+				Lratio = (ph0[0]-pt0[0])*(ph0[0]-pt0[0])+(ph0[1]-pt0[1])*(ph0[1]-pt0[1]);
+				Lratio = sqrtf(Lratio/Dp);
+			}
+		}else{	// DIS0<rt && DIS1>rt, in->out
+			r->inout = 0;
+			Lratio = (ph1[0]-pt1[0])*(ph1[0]-pt1[0])+(ph1[1]-pt1[1])*(ph1[1]-pt1[1]);	    	
+			if(Dp>Lratio){
+				Lratio = 1-sqrtf(Lratio/Dp);
+			}else{
+				Lratio = (ph0[0]-pt1[0])*(ph0[0]-pt1[0])+(ph0[1]-pt1[1])*(ph0[1]-pt1[1]);
+				Lratio = 1-sqrtf(Lratio/Dp);
+			}
+		}
+		r->Lmove = r->Lmove*Lratio;
+	}
+	// else if((DIS0<=rt2 && DIS1>=rt2) || (DIS0>rt2 && DIS1>rt2)) {
+	// 	r->inout = 0;
+	// }
+	// else if((DIS0>=rt2 && DIS1<=rt2) || (DIS0<rt2 && DIS1<rt2)) {
+	// 	r->inout = 1;
+	// }else{
+
+	// }
+}
+
 /** 
  * \brief Branch-less Badouel-based SSE4 ray-tracer to advance photon by one step
  * 
@@ -962,7 +1058,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	if(r->faceid>=0 && bary.x>=0){
 	    medium *prop;
 	    int *enb, *ee=(int *)(tracer->mesh->elem+eid*tracer->mesh->elemlen);
-	    int last;
+	    int last, hit=0;
 	    float mus;
 	    if(r->inout){
 	    	last=2;
@@ -970,8 +1066,8 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	    }else{
 	    	prop=tracer->mesh->med+(tracer->mesh->type[eid]);
 	    }
-	    if(r->vesselid>5)
-	    	prop=tracer->mesh->med+(tracer->mesh->type[eid]);
+	    // if(r->vesselid>5)
+	    // 	prop=tracer->mesh->med+(tracer->mesh->type[eid]);
 
 	    rc=prop->n*R_C0;
             currweight=r->weight;
@@ -987,100 +1083,21 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	    r->isend=(Lp0>dlen);
 	    r->Lmove=((r->isend) ? dlen : Lp0);
 
-	    if(r->vesselid<6){	// vesselid==6: there is no edge labeled as vessel in the current element
-		float3 u, E0, E1, OP, PP, Pt, PP0, PP1;
-		float norm, normr, st, DIS0, DIS1, pt0[2], pt1[2], theta, ph0[2],ph1[2],Lratio;
-		int en0, en1;
-
-		en0 = ee[e2n[r->vesselid][0]]-1;
-		en1 = ee[e2n[r->vesselid][1]]-1;
-		E0 = tracer->mesh->node[en0];
-		E1 = tracer->mesh->node[en1];
-
-		vec_diff(&E0,&E1,&u);
-		norm = dist(&E0,&E1);	// get coordinates and compute distance between two nodes
-		normr = 1/norm;
-		vec_mult(&u,normr,&u);	// normal vector of the edge
-		r->u = u;
-		r->E = E0;
-
-		PP = r->p0;				// P0
-		vec_diff(&E0,&PP,&OP);
-		st = vec_dot(&OP,&u);
-		vec_mult(&u,st,&Pt);
-		vec_diff(&Pt,&OP,&PP0);		// PP0: P0 projection on plane
-		DIS0 = PP0.x*PP0.x+PP0.y*PP0.y+PP0.z*PP0.z;
-
-		vec_mult(&r->vec,r->Lmove,&PP);
-		vec_add(&r->p0,&PP,&PP);		// P1
-		vec_diff(&E0,&PP,&OP);
-		st = vec_dot(&OP,&u);
-		vec_mult(&u,st,&Pt);
-		vec_diff(&Pt,&OP,&PP1);		// PP1: P1 projection on plane
-		DIS1 = PP1.x*PP1.x+PP1.y*PP1.y+PP1.z*PP1.z;
-
-		// update Lmove and reflection
-		float dx, dy, dr2, drr2, Dt, delta, rt, rt2, sgn, xa, xb, ya, yb, Dp;
-		rt = r->vesselr;
-		rt2 = rt*rt;
-		if((DIS0>rt2+10*EPS && DIS1<rt2-10*EPS) || (DIS0<rt2-10*EPS && DIS1>rt2+10*EPS)) 	// hit vessel out->in or in->out
-		{		    	
-			r->isvessel = 1;
-			DIS0 = sqrtf(DIS0);
-			DIS1 = sqrtf(DIS1);
-			theta = vec_dot(&PP0,&PP1);
-			theta = theta/(DIS0*DIS1+EPS);
-
-			pt0[0] = DIS0;
-			pt0[1] = 0;
-			pt1[0] = DIS1*theta;
-			pt1[1] = DIS1*sqrtf(fabs(1-theta*theta));
-			dx = pt1[0]-pt0[0];
-			dy = pt1[1]-pt0[1];
-			dr2 = dx*dx+dy*dy;
-			drr2 = 1/dr2;
-			Dt = pt0[0]*pt1[1];
-			delta = sqrtf(rt*rt*dr2-Dt*Dt);	// must be >0
-			sgn = (dy>=0) ? 1.0f : -1.0f;
-			xa = Dt*dy*drr2;
-			xb = sgn*dx*delta*drr2;
-			ya = -Dt*dx*drr2;
-			yb = fabs(dy)*delta*drr2;
-			ph0[0] = xa+xb;
-			ph0[1] = ya+yb;
-			ph1[0] = xa-xb;
-			ph1[1] = ya-yb;
-			Dp = (pt1[0]-pt0[0])*(pt1[0]-pt0[0])+(pt1[1]-pt0[1])*(pt1[1]-pt0[1]);
-			if(DIS0>rt && DIS1<rt){		// out->in
-				r->inout = 1;
-				Lratio = (ph1[0]-pt0[0])*(ph1[0]-pt0[0])+(ph1[1]-pt0[1])*(ph1[1]-pt0[1]);	    	
-				if(Dp>Lratio){
-					Lratio = sqrtf(Lratio/Dp);
-				}else{
-					Lratio = (ph0[0]-pt0[0])*(ph0[0]-pt0[0])+(ph0[1]-pt0[1])*(ph0[1]-pt0[1]);
-					Lratio = sqrtf(Lratio/Dp);
-				}
-			}else{	// DIS0<rt && DIS1>rt, in->out
-				r->inout = 0;
-				Lratio = (ph1[0]-pt1[0])*(ph1[0]-pt1[0])+(ph1[1]-pt1[1])*(ph1[1]-pt1[1]);	    	
-				if(Dp>Lratio){
-					Lratio = 1-sqrtf(Lratio/Dp);
-				}else{
-					Lratio = (ph0[0]-pt1[0])*(ph0[0]-pt1[0])+(ph0[1]-pt1[1])*(ph0[1]-pt1[1]);
-					Lratio = 1-sqrtf(Lratio/Dp);
-				}
-			}
-			r->Lmove = r->Lmove*Lratio;
+	    if(r->vesselid[0]<6 && !hit){	// vesselid==6: there is no edge labeled as vessel in the current element		
+		// update r->isvessel, r->inout, r->u, r->E0, r->Lmove
+		hit = ray_cylinder_intersect(r, tracer, ee, 0);
+	    }else if(r->vesselid[1]<6 && !hit){
+	    	// update r->isvessel, r->inout, r->u, r->E0, r->Lmove
+		hit = ray_cylinder_intersect(r, tracer, ee, 1);
+	    }else if(!hit)){	// not hit any vessel in the current element
+		float npdist0,npdist1;
+		for(int ih=0;ih<4;ih++){
+			npdist0=dist(&r->p0,&tracer->mesh->node[ee[ih]-1]);
+			npdist1=dist(&r->p0,&tracer->mesh->node[ee[ih]-1]);
 		}
-		else if((DIS0<=rt2 && DIS1>=rt2) || (DIS0>rt2 && DIS1>rt2)) {
-			r->inout = 0;
-		}
-		else if((DIS0>=rt2 && DIS1<=rt2) || (DIS0<rt2 && DIS1<rt2)) {
-			r->inout = 1;
-		}else{
+	    }
 
-		}
-	    }else{
+	    else{
 	    	r->inout = 0;
 	    }
 	    
@@ -1266,11 +1283,11 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 
 	int oldeid,fixcount=0,exitdet=0;
 	int *enb, *vid;
-	float *vr;
+	float *vr,*nr;
         float mom;
 	float kahany, kahant;
-	//	p0          vec                                         pout                    bary0     eid      faceid      isend                      photonid     focus           oldidx          vesselr
-	ray r={cfg->srcpos,{cfg->srcdir.x,cfg->srcdir.y,cfg->srcdir.z},{MMC_UNDEFINED,0.f,0.f},cfg->bary0,cfg->e0,cfg->dim.y-1,0,0,1.f,0.f,0.f,0.f,0.f,0.,0,NULL,NULL,cfg->srcdir.w,0,0xFFFFFFFF,0.0,0,0.f,0,0,{0.f,0.f,0.f},{0.f,0.f,0.f},0};
+	//	p0          vec                                         pout                    bary0     eid      faceid      isend                      photonid     focus           oldidx              vesselr
+	ray r={cfg->srcpos,{cfg->srcdir.x,cfg->srcdir.y,cfg->srcdir.z},{MMC_UNDEFINED,0.f,0.f},cfg->bary0,cfg->e0,cfg->dim.y-1,0,0,1.f,0.f,0.f,0.f,0.f,0.,0,NULL,NULL,cfg->srcdir.w,0,0xFFFFFFFF,0.0,{0,0},{0.f,0.f},0,0,{0.f,0.f,0.f},{0.f,0.f,0.f}};
 
 	float (*engines[5])(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit)=
 	       {plucker_raytet,havel_raytet,badouel_raytet,branchless_badouel_raytet,branchless_badouel_raytet};
@@ -1326,17 +1343,16 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 #endif	
 	while(1){  /*propagate a photon until exit*/
 
-	     vid = (int *)(mesh->vessel+(r.eid-1));
-	     r.vesselid = *vid;
-	     // r.vesselid = 2;
-	     vr = (float *)(mesh->radius+(r.eid-1));
-	     r.vesselr = *vr;
-	     // vid = (int *)(mesh->vessel+(r.eid-1)*2);
-	     // r.vesselid[0] = vid[0];
-	     // r.vesselid[1] = vid[1];
-	     // vr = (float *)(mesh->radius+(r.eid-1)*2);
-	     // r.vesselr[0] = vr[0];
-	     // r.vesselr[1] = vr[1];
+	     // vid = (int *)(mesh->vessel+(r.eid-1));
+	     // r.vesselid = *vid;
+	     // vr = (float *)(mesh->radius+(r.eid-1));
+	     // r.vesselr = *vr;
+	     vid = (int *)(mesh->vessel+(r.eid-1)*2);
+	     r.vesselid[0] = vid[0];
+	     r.vesselid[1] = vid[1];
+	     vr = (float *)(mesh->radius+(r.eid-1)*2);
+	     r.vesselr[0] = vr[0];
+	     r.vesselr[1] = vr[1];
 
 	    r.slen=(*tracercore)(&r,tracer,cfg,visit);
 	    if(r.pout.x==MMC_UNDEFINED){
@@ -1393,18 +1409,17 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	    	    if(r.pout.x!=MMC_UNDEFINED && (cfg->debuglevel&dlMove))
 	    		MMC_FPRINTF(cfg->flog,"P %f %f %f %d %lu %e\n",r.pout.x,r.pout.y,r.pout.z,r.eid,id,r.slen);
 
-	    	    vid = (int *)(mesh->vessel+(r.eid-1));
-		    r.vesselid = *vid;
-		    // r.vesselid = 2;
-		    vr = (float *)(mesh->radius+(r.eid-1));
-		    r.vesselr = *vr;
-	    	    // vid = (int *)(mesh->vessel+(r.eid-1)*2);
-	     	   //  r.vesselid[0] = vid[0];
-	     	   //  r.vesselid[1] = vid[1];
-	     	   //  vr = (float *)(mesh->radius+(r.eid-1)*2);
-	     	   //  r.vesselr[0] = vr[0];
-	     	   //  r.vesselr[1] = vr[1];
-	     	    
+	    	    // vid = (int *)(mesh->vessel+(r.eid-1));
+		    // r.vesselid = *vid;
+		    // vr = (float *)(mesh->radius+(r.eid-1));
+		    // r.vesselr = *vr;
+	    	    vid = (int *)(mesh->vessel+(r.eid-1)*2);
+	     	    r.vesselid[0] = vid[0];
+	     	    r.vesselid[1] = vid[1];
+	     	    vr = (float *)(mesh->radius+(r.eid-1)*2);
+	     	    r.vesselr[0] = vr[0];
+	     	    r.vesselr[1] = vr[1];
+
 	    	    r.slen=(*tracercore)(&r,tracer,cfg,visit);
 		    if(cfg->issavedet && r.Lmove>0.f && mesh->type[r.eid-1]>0)
 			r.partialpath[mesh->prop-1+mesh->type[r.eid-1]]+=r.Lmove;

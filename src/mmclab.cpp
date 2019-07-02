@@ -460,8 +460,8 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
         printf("mmc.e0=%d;\n",cfg->e0);
     }else if(strcmp(name,"node")==0){
         arraydim=mxGetDimensions(item);
-	if(arraydim[0]<=0 || arraydim[1]!=3)
-            MEXERROR("the 'node' field must have 3 columns (x,y,z)");
+	if(arraydim[0]<=0 || arraydim[1]!=4)
+            MEXERROR("the 'node' field must have 4 columns (x,y,z,r)");
         double *val=mxGetPr(item);
         mesh->nn=arraydim[0];
 	if(mesh->node) free(mesh->node);
@@ -470,19 +470,34 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
           for(i=0;i<mesh->nn;i++)
              ((float *)(&mesh->node[i]))[j]=val[j*mesh->nn+i];
         printf("mmc.nn=%d;\n",mesh->nn);
+  if(mesh->nradius) free(mesh->nradius);
+        mesh->nradius=(float  *)malloc(sizeof(int )*mesh->nn);
+        for(i=0;i<mesh->nn;i++)
+           mesh->nradius[i]=val[3*mesh->nn+i];
     }else if(strcmp(name,"elem")==0){
         arraydim=mxGetDimensions(item);
-	if(arraydim[0]<=0 || arraydim[1]<4)
-            MEXERROR("the 'elem' field must have 4 columns (e1,e2,e3,e4)");
+	if(arraydim[0]<=0 || arraydim[1]<8)
+            MEXERROR("the 'elem' field must have 8 columns (e1,e2,e3,e4,vessel1,vessel2,r1,r2)");
         double *val=mxGetPr(item);
         mesh->ne=arraydim[0];
-	mesh->elemlen=arraydim[1];
+	// mesh->elemlen=arraydim[1];
+  mesh->elemlen=4;
 	if(mesh->elem) free(mesh->elem);
-        mesh->elem=(int *)calloc(sizeof(int)*arraydim[1],mesh->ne);
+        mesh->elem=(int *)calloc(sizeof(int)*mesh->elemlen,mesh->ne);
         for(j=0;j<mesh->elemlen;j++)
           for(i=0;i<mesh->ne;i++)
              mesh->elem[i*mesh->elemlen+j]=val[j*mesh->ne+i];
         printf("mmc.elem=[%d,%d];\n",mesh->ne,mesh->elemlen);
+  if(mesh->vessel) free(mesh->vessel);
+        mesh->vessel=(int *)calloc(sizeof(int)*2,mesh->ne);
+        for(j=4;j<6;j++)
+          for(i=0;i<mesh->ne;i++)
+             mesh->vessel[i*2+(j-4)]=val[j*mesh->ne+i];
+  if(mesh->radius) free(mesh->radius);
+        mesh->radius=(int *)calloc(sizeof(float)*2,mesh->ne);
+        for(j=6;j<8;j++)
+          for(i=0;i<mesh->ne;i++)
+             mesh->radius[i*2+(j-6)]=val[j*mesh->ne+i];
     }else if(strcmp(name,"elemprop")==0){
         arraydim=mxGetDimensions(item);
 	if(MAX(arraydim[0],arraydim[1])==0)
@@ -494,29 +509,6 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
         for(i=0;i<mesh->ne;i++)
            mesh->type[i]=val[i];
         printf("mmc.ne=%d;\n",mesh->ne);
-    }
-    else if(strcmp(name,"radius")==0){
-        arraydim=mxGetDimensions(item);
-        if(MAX(arraydim[0],arraydim[1])==0)
-            MEXERROR("the 'radius' field can not be empty");
-        double *val=mxGetPr(item);
-        mesh->ne=MAX(arraydim[0],arraydim[1]);
-        if(mesh->radius) free(mesh->radius);
-        mesh->radius=(float  *)malloc(sizeof(int )*mesh->ne);
-        for(i=0;i<mesh->ne;i++)
-           mesh->radius[i]=val[i];
-        printf("mmc.radius=;\n");
-    }else if(strcmp(name,"vessel")==0){
-        arraydim=mxGetDimensions(item);
-        if(MAX(arraydim[0],arraydim[1])==0)
-            MEXERROR("the 'vessel' field can not be empty");
-        double *val=mxGetPr(item);
-        mesh->ne=MAX(arraydim[0],arraydim[1]);
-        if(mesh->vessel) free(mesh->vessel);
-        mesh->vessel=(int  *)malloc(sizeof(int )*mesh->ne);
-        for(i=0;i<mesh->ne;i++)
-           mesh->vessel[i]=val[i];
-        printf("mmc.vessel=;\n");
     }
     else if(strcmp(name,"facenb")==0){
         arraydim=mxGetDimensions(item);
