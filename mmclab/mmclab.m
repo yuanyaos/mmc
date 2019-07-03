@@ -241,12 +241,24 @@ for i=1:len
     if(~isfield(cfg(i),'node') || ~isfield(cfg(i),'elem'))
         error('cfg.node or cfg.elem is missing');
     end
+    if(isfield(cfg(i),'vessel'))
+        if(cfg(i).vessel)
+            if(size(cfg(i).node,2)<4 || size(cfg(i).elem,2)<5)
+                error('cfg.node must contain 4 columns and cfg.elem must contain 8 columns');                
+            end
+            vesseln = cfg(i).node(:,4);
+            vessel = cfg(i).elem(:,5:6);
+            vesselr = cfg(i).elem(:,7:8);
+            cfg(i).node = cfg(i).node(:,1:3);
+            cfg(i).elem = cfg(i).elem(:,1:4);
+        end
+    end
     if(~isfield(cfg(i),'elemprop') ||isempty(cfg(i).elemprop) && size(cfg(i).elem,2)>4)
         cfg(i).elemprop=cfg(i).elem(:,5);
     end
     if(~isfield(cfg(i),'isreoriented') || isempty(cfg(i).isreoriented) || cfg(i).isreoriented==0)
         [cfg(i).elem,~,idx]=meshreorient(cfg(i).node,cfg(i).elem(:,1:4));
-        cfg.vessel(idx,:) = reorient(cfg.vessel(idx,:)+1);
+        vessel(idx,:) = reorient(vessel(idx,:)+1);
         cfg(i).isreoriented=1;
     end
     if(~isfield(cfg(i),'facenb') || isempty(cfg(i).facenb))
@@ -298,7 +310,7 @@ for i=1:len
             [cfg(i).node,cfg(i).elem] = mmcaddsrc(cfg(i).node,cfg(i).elem,sdom);
             cfg(i).elemprop=cfg(i).elem(:,5);
             [cfg(i).elem,~,idx]=meshreorient(cfg(i).node,cfg(i).elem(:,1:4));
-            cfg.vessel(idx,:) = reorient(cfg.vessel(idx,:)+1);
+            vessel(idx,:) = reorient(vessel(idx,:)+1);
             cfg(i).facenb=faceneighbors(cfg(i).elem);
             cfg(i).evol=elemvolume(cfg(i).node,cfg(i).elem);
             cfg(i).isreoriented=1;
@@ -323,6 +335,13 @@ for i=1:len
     end
     if(~isfield(cfg(i),'prop') || size(cfg(i).prop,1)<max(cfg(i).elemprop)+1 || min(cfg(i).elemprop<=0))
         error('cfg.prop field is missing or insufficient');
+    end
+    
+    if(isfield(cfg(i),'vessel'))
+        if(cfg(i).vessel)
+            cfg(i).node = [cfg(i).node vesseln];
+            cfg(i).elem = [cfg(i).elem vessel vesselr];
+        end
     end
 end
 

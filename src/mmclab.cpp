@@ -494,7 +494,7 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
           for(i=0;i<mesh->ne;i++)
              mesh->vessel[i*2+(j-4)]=val[j*mesh->ne+i];
   if(mesh->radius) free(mesh->radius);
-        mesh->radius=(int *)calloc(sizeof(float)*2,mesh->ne);
+        mesh->radius=(float *)calloc(sizeof(float)*2,mesh->ne);
         for(j=6;j<8;j++)
           for(i=0;i<mesh->ne;i++)
              mesh->radius[i*2+(j-6)]=val[j*mesh->ne+i];

@@ -1,3 +1,5 @@
+% Validation for vessel MMC
+
 clear
 close all
 
@@ -15,26 +17,36 @@ addpath('/drives/neza2/users/yaoshen/NEU/Research/mmc/mmc/vessel_mmc/dijkstra')
 elem = elem(:,1:4);
 % eleuniq = unique(elem(:));
 % pse = round(rand(2,1)*length(eleuniq));
-ps(1) = 56;
-pe(2) = 2;
-pstart = node(pse(1),:);
-pend = node(pse(2),:);
-[vessel] = vessellabel(elem,node,pse);
+pse(1) = 56;
+pse(2) = 2;
+[vessel1,vesseln1,pathelem1,nodeelem1] = vessellabel(elem,node,pse,2,0);
 
-figure,plotmesh(node,elem,'facealpha',0.1,'edgealpha',0.5,'facecolor','w')
-hold on
-plot3(pstart(1,1),pstart(1,2),pstart(1,3),'-og','LineWidth',2)
-plot3(pend(end,1),pend(end,2),pend(end,3),'-or','LineWidth',2)
-xlabel('x'),ylabel('y'),zlabel('z')
+pse(1) = 70;
+pse(2) = 8;
+[vessel2,vesseln2,pathelem2,nodeelem2] = vessellabel(elem,node,pse,1,0);
+
+% combine
+vd = vessel1-vessel2;
+i1 = find(vd==0);
+i2 = find(vessel2~=6);
+i2 = intersect(i1,i2);  % overlap local index
+vessel2(i2) = 6;
+vessel = [vessel1 vessel2 2*ones(size(vessel1)) 1*ones(size(vessel2))];
+
+vesseln = [vesseln1, vesseln2];
+vesseln = max(vesseln,[],2);
 %% run mmc
 
 clear cfg
-cfg.nphoton=1e7;
+cfg.nphoton=1e6;
 cfg.node = node;
+cfg.node = [cfg.node vesseln];
 cfg.elem = elem;
+cfg.elem = [cfg.elem vessel];
+cfg.vessel = 1;
 cfg.elemprop=ones(size(cfg.elem,1),1);
-cfg.vessel = vessel;
-cfg.radius = 2*ones(size(cfg.elem,1),1);
+% cfg.vessel = vessel;
+% cfg.radius = 2*ones(size(cfg.elem,1),1);
 cfg.srcpos=[30.5 30.5 0];
 cfg.srcdir=[0 0 1];
 cfg.prop=[0 0 1 1;0.005 1 0 1.37;0.5 1 0 1.37];
