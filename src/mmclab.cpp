@@ -471,9 +471,11 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
              ((float *)(&mesh->node[i]))[j]=val[j*mesh->nn+i];
         printf("mmc.nn=%d;\n",mesh->nn);
   if(mesh->nradius) free(mesh->nradius);
-        mesh->nradius=(float  *)malloc(sizeof(int )*mesh->nn);
-        for(i=0;i<mesh->nn;i++)
-           mesh->nradius[i]=val[3*mesh->nn+i];
+        mesh->nradius=(float  *)malloc(sizeof(float )*mesh->nn);
+        for(i=0;i<mesh->nn;i++){
+          mesh->nradius[i]=val[3*mesh->nn+i];          
+        }
+           
     }else if(strcmp(name,"elem")==0){
         arraydim=mxGetDimensions(item);
 	if(arraydim[0]<=0 || arraydim[1]<8)
@@ -492,12 +494,12 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
         mesh->vessel=(int *)calloc(sizeof(int)*2,mesh->ne);
         for(j=4;j<6;j++)
           for(i=0;i<mesh->ne;i++)
-             mesh->vessel[i*2+(j-4)]=val[j*mesh->ne+i];
+            mesh->vessel[i*2+(j-4)]=val[j*mesh->ne+i];        
   if(mesh->radius) free(mesh->radius);
         mesh->radius=(float *)calloc(sizeof(float)*2,mesh->ne);
         for(j=6;j<8;j++)
           for(i=0;i<mesh->ne;i++)
-             mesh->radius[i*2+(j-6)]=val[j*mesh->ne+i];
+            mesh->radius[i*2+(j-6)]=val[j*mesh->ne+i];
     }else if(strcmp(name,"elemprop")==0){
         arraydim=mxGetDimensions(item);
 	if(MAX(arraydim[0],arraydim[1])==0)

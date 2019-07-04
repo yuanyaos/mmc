@@ -1,7 +1,7 @@
 % Validation for vessel MMC
 
 clear
-close all
+% close all
 
 addpath(genpath('/space/neza/2/users/yaoshen/NEU/Research/Redbird/tensorlab/'))
 addpath(genpath('/space/neza/2/users/yaoshen/NEU/Research/iso2mesh/'))
@@ -43,6 +43,7 @@ cfg.node = node;
 cfg.node = [cfg.node vesseln];
 cfg.elem = elem;
 cfg.elem = [cfg.elem vessel];
+% plotvessel(cfg.elem,cfg.node)
 cfg.vessel = 1;
 cfg.elemprop=ones(size(cfg.elem,1),1);
 % cfg.vessel = vessel;
@@ -66,7 +67,23 @@ figure,slice3(log10(flux.data))
 caxis([-5 8])
 colormap jet
 
-%% Compare
+%% Compare vessel MMC with and without connection point
+
+% 1, 18, 22
+n = 22;
+
+figure,
+load /drives/neza2/users/yaoshen/NEU/Research/mmc/without_connection.mat
+subplot(121),imagesc(log10(squeeze(flux.data(1:50,1:60,n))),[-4 8]);
+colorbar
+title(['Without connection, slice=' num2str(n)]),colormap jet
+
+load /drives/neza2/users/yaoshen/NEU/Research/mmc/with_connection.mat
+subplot(122),imagesc(log10(squeeze(flux.data(1:50,1:60,n))),[-4 8]);
+colorbar
+title(['With connection, slice=' num2str(n)]),colormap jet
+
+%% Compare original MMC and vessel MMC
 
 n = 20;
 [xx,yy]=meshgrid(0:60,0:60); 
