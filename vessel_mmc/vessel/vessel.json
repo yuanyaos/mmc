@@ -1,0 +1,22 @@
+{
+    "Mesh": {
+	"MeshID": "vessel",
+	"InitElem": 3
+    },
+    "Session": {
+	"Photons":  100000,
+	"RNGSeed":  17182818,
+	"ID":       "vessel"
+    },
+    "Forward": {
+	"T0": 0.0e+00,
+	"T1": 5.0e-09,
+	"Dt": 5.0e-09
+    },
+    "Optode": {
+	"Source": {
+	    "Pos": [30.5, 30.5, 0.0],
+	    "Dir": [0.0, 0.0, 1.0]
+	}
+    }
+}

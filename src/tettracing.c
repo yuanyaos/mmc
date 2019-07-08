@@ -1135,7 +1135,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 		hit = ray_cylinder_intersect(r, tracer, ee, 1);
 	    }
 	    else if(!hit){	// not hit any vessel in the current element
-	    	float nr;	
+	    	float nr;
 		for(int ih=0;ih<4;ih++){	// check if hits any node vessel
 			nr = tracer->mesh->nradius[ee[ih]-1];
 			if(!nr)

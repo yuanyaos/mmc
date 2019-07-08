@@ -25,25 +25,30 @@ function savemmcmesh(key,node,elem,face,evol,facenb)
 %
 
 if(nargin<5)
-  evol=elemvolume(node,elem(:,1:4));
+  evol=elemvolume(node(:,1:3),elem(:,1:4));
 end
 
 if(~isempty(node))
   fid=fopen(['node_',key,'.dat'],'wt');
   fprintf(fid,'%d\t%d\n',1,size(node,1));
-  fprintf(fid,'%d\t%16.8e\t%16.8e\t%16.8e\n',[1:length(node);node']);
+  fprintf(fid,'%d\t%16.8e\t%16.8e\t%16.8e\t%16.8e\n',[1:length(node);node']);
   fclose(fid);
 end
 
 if(~isempty(elem))
-  elem(:,1:4)=meshreorient(node,elem(:,1:4));
+  reorient=[0 2 1 4 3 5 6];
+  [elem(:,1:4),~,idx]=meshreorient(node(:,1:3),elem(:,1:4));
+  elem(idx,6:7) = reorient(elem(idx,6:7)+1);
+%   elem(:,1:4)=meshreorient(node,elem(:,1:4));
 
   fid=fopen(['elem_',key,'.dat'],'wt');
   fprintf(fid,'%d\t%d\n',1,size(elem,1));
   if(size(elem,2)==4)
-    fprintf(fid,'%d\t%d\t%d\t%d\t%d\t1\n', [1:length(elem);elem']);
+    fprintf(fid,'%d\t%d\t%d\t%d\t%d\t1\n', [1:size(elem,1);elem']);
   elseif(size(elem,2)==5)
-    fprintf(fid,'%d\t%d\t%d\t%d\t%d\t%d\n',[1:length(elem);elem']);
+    fprintf(fid,'%d\t%d\t%d\t%d\t%d\t%d\n',[1:size(elem,1);elem']);
+  elseif(size(elem,2)>5)
+    fprintf(fid,'%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%16.8e\t%16.8e\n',[1:size(elem,1);elem']);
   else
     fclose(fid);
     error('wrong elem input: must be 4 or 5 columns');

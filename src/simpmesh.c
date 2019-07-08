@@ -183,8 +183,9 @@ void mesh_loadnode(tetmesh *mesh,mcconfig *cfg){
 		MESH_ERROR("node file has wrong format");
 	}
 	mesh->node=(float3 *)calloc(sizeof(float3),mesh->nn);
+	mesh->nradius=(float *)calloc(sizeof(float),mesh->nn);
 	for(i=0;i<mesh->nn;i++){
-		if(fscanf(fp,"%d %f %f %f",&tmp,&(mesh->node[i].x),&(mesh->node[i].y),&(mesh->node[i].z))!=4)
+		if(fscanf(fp,"%d %f %f %f %f",&tmp,&(mesh->node[i].x),&(mesh->node[i].y),&(mesh->node[i].z),&(mesh->nradius[i]))!=5)
 			MESH_ERROR("node file has wrong format");
 	}
 	fclose(fp);
@@ -290,7 +291,8 @@ void mesh_loadmedia(tetmesh *mesh,mcconfig *cfg){
 void mesh_loadelem(tetmesh *mesh,mcconfig *cfg){
 	FILE *fp;
 	int tmp,len,i,j;
-	int *pe;
+	int *pe,*pv;
+	float *pr;
 	char felem[MAX_PATH_LENGTH];
 
 	mesh_filenames("elem_%s.dat",felem,cfg);
@@ -301,24 +303,37 @@ void mesh_loadelem(tetmesh *mesh,mcconfig *cfg){
 	if(len!=2 || mesh->ne<=0){
 		MESH_ERROR("element file has wrong format");
 	}
-	if(mesh->elemlen<4)
+	// if(mesh->elemlen!=10){
+	// 	MESH_ERROR("element file for vessel MMC has wrong format");
+	// }
+	// if(mesh->elemlen<4)
 	    mesh->elemlen=4;
 
 	mesh->elem=(int *)malloc(sizeof(int)*mesh->elemlen*mesh->ne);
 	mesh->type=(int *)malloc(sizeof(int )*mesh->ne);
+	mesh->vessel=(int *)malloc(sizeof(int)*2*mesh->ne);
+	mesh->radius=(float *)malloc(sizeof(float)*2*mesh->ne);
 	if(!cfg->basisorder)
 	  if(cfg->method==rtBLBadouel)
 	    mesh->weight=(double *)calloc(sizeof(double)*mesh->ne,cfg->maxgate*cfg->srcnum);
 
 	for(i=0;i<mesh->ne;i++){
 		pe=mesh->elem+i*mesh->elemlen;
+		pv=mesh->vessel+i*2;
+		pr=mesh->radius+i*2;
 		if(fscanf(fp,"%d",&tmp)!=1)
 			break;
 		for(j=0;j<mesh->elemlen;j++)
 		        if(fscanf(fp,"%d",pe+j)!=1)
-			    break;
+			    break;		
 		if(fscanf(fp,"%d",mesh->type+i)!=1)
 			break;
+		for(j=0;j<2;j++)
+		        if(fscanf(fp,"%d",pv+j)!=1)
+			    break;
+		for(j=0;j<2;j++)
+		        if(fscanf(fp,"%f",pr+j)!=1)
+			    break;
         }
 	fclose(fp);
 	if(i<mesh->ne)

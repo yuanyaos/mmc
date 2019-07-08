@@ -1,0 +1,11 @@
+1000000                  # total photon number (can be overwriten by -n)
+17182818             # RNG seed, negative to regenerate
+30.5 30.5 0.             # source position (mm)
+0. 0. 1.             # initial incident vector
+0.e+00 5.e-09 5e-9  # time-gates(s): start, end, step
+vessel              # mesh id: name stub to all mesh files
+2                    # index of element (starting from 1) which encloses the source
+3	1            # detector number and radius (mm)
+20.0	40.0	0.0  # detector 1 position (mm)
+20.0	30.0	0.0  # ...
+20.0	20.0	0.0
