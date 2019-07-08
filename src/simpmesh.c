@@ -532,9 +532,21 @@ void mesh_clear(tetmesh *mesh){
 		free(mesh->node);
 		mesh->node=NULL;
 	}
+	if(mesh->nradius){
+		free(mesh->nradius);
+		mesh->nradius=NULL;
+	}
 	if(mesh->elem){
 		free(mesh->elem);
 		mesh->elem=NULL;
+	}
+	if(mesh->vessel){
+		free(mesh->vessel);
+		mesh->vessel=NULL;
+	}
+	if(mesh->radius){
+		free(mesh->radius);
+		mesh->radius=NULL;
 	}
 	if(mesh->facenb){
 		free(mesh->facenb);
