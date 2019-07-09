@@ -904,7 +904,7 @@ float ray_cylinder_intersect(ray *r, raytracer *tracer, int *ee, int index){
 
 	vec_diff(&E0,&E1,&u);
 	norm = dist(&E0,&E1);	// get coordinates and compute distance between two nodes
-	normr = 1/norm;
+	normr = 1.0f/norm;
 	vec_mult(&u,normr,&u);	// normal vector of the edge
 	r->u = u;
 	r->E = E0;
@@ -914,7 +914,7 @@ float ray_cylinder_intersect(ray *r, raytracer *tracer, int *ee, int index){
 	st = vec_dot(&OP,&u);
 	vec_mult(&u,st,&Pt);
 	vec_diff(&Pt,&OP,&PP0);		// PP0: P0 projection on plane
-	DIS0 = PP0.x*PP0.x+PP0.y*PP0.y+PP0.z*PP0.z;
+	DIS0 = vec_dot(&PP0,&PP0);
 
 	vec_mult(&r->vec,r->Lmove,&PP);
 	vec_add(&r->p0,&PP,&PP);		// P1
@@ -922,13 +922,13 @@ float ray_cylinder_intersect(ray *r, raytracer *tracer, int *ee, int index){
 	st = vec_dot(&OP,&u);
 	vec_mult(&u,st,&Pt);
 	vec_diff(&Pt,&OP,&PP1);		// PP1: P1 projection on plane
-	DIS1 = PP1.x*PP1.x+PP1.y*PP1.y+PP1.z*PP1.z;
+	DIS1 = vec_dot(&PP1,&PP1);
 
 	// update Lmove and reflection
 	float dx, dy, dr2, drr2, Dt, delta, rt, rt2, sgn, xa, xb, ya, yb, Dp;
 	rt = r->vesselr[index];
 	rt2 = rt*rt;
-	if((DIS0>rt2+10*EPS && DIS1<rt2-10*EPS) || (DIS0<rt2-10*EPS && DIS1>rt2+10*EPS)) 	// hit vessel out->in or in->out
+	if((DIS0>rt2+EPS2 && DIS1<rt2-EPS2) || (DIS0<rt2-EPS2 && DIS1>rt2+EPS2)) 	// hit vessel out->in or in->out
 	{		    	
 		r->isvessel = 1;
 
@@ -936,17 +936,17 @@ float ray_cylinder_intersect(ray *r, raytracer *tracer, int *ee, int index){
 		DIS1 = sqrtf(DIS1);
 		theta = vec_dot(&PP0,&PP1);
 		theta = theta/(DIS0*DIS1+EPS);
-
 		pt0[0] = DIS0;
 		pt0[1] = 0;
 		pt1[0] = DIS1*theta;
 		pt1[1] = DIS1*sqrtf(fabs(1-theta*theta));
+
 		dx = pt1[0]-pt0[0];
 		dy = pt1[1]-pt0[1];
 		dr2 = dx*dx+dy*dy;
-		drr2 = 1/dr2;
+		drr2 = 1.0f/dr2;
 		Dt = pt0[0]*pt1[1];
-		delta = sqrtf(rt*rt*dr2-Dt*Dt);	// must be >0
+		delta = sqrtf(rt2*dr2-Dt*Dt);	// must be >0
 		sgn = (dy>=0) ? 1.0f : -1.0f;
 		xa = Dt*dy*drr2;
 		xb = sgn*dx*delta*drr2;
@@ -956,23 +956,23 @@ float ray_cylinder_intersect(ray *r, raytracer *tracer, int *ee, int index){
 		ph0[1] = ya+yb;
 		ph1[0] = xa-xb;
 		ph1[1] = ya-yb;
-		Dp = (pt1[0]-pt0[0])*(pt1[0]-pt0[0])+(pt1[1]-pt0[1])*(pt1[1]-pt0[1]);
+		Dp = dist2d2(pt0,pt1);
 		if(DIS0>rt && DIS1<rt){		// out->in
 			r->inout = 1;
-			Lratio = (ph1[0]-pt0[0])*(ph1[0]-pt0[0])+(ph1[1]-pt0[1])*(ph1[1]-pt0[1]);	    	
+			Lratio = dist2d2(pt0,ph1);
 			if(Dp>Lratio){
 				Lratio = sqrtf(Lratio/Dp);
 			}else{
-				Lratio = (ph0[0]-pt0[0])*(ph0[0]-pt0[0])+(ph0[1]-pt0[1])*(ph0[1]-pt0[1]);
+				Lratio = dist2d2(pt0,ph0);
 				Lratio = sqrtf(Lratio/Dp);
 			}
 		}else{	// DIS0<rt && DIS1>rt, in->out
 			r->inout = 0;
-			Lratio = (ph1[0]-pt1[0])*(ph1[0]-pt1[0])+(ph1[1]-pt1[1])*(ph1[1]-pt1[1]);	    	
+			Lratio = dist2d2(pt1,ph1);
 			if(Dp>Lratio){
 				Lratio = 1-sqrtf(Lratio/Dp);
 			}else{
-				Lratio = (ph0[0]-pt1[0])*(ph0[0]-pt1[0])+(ph0[1]-pt1[1])*(ph0[1]-pt1[1]);
+				Lratio = dist2d2(pt1,ph0);
 				Lratio = 1-sqrtf(Lratio/Dp);
 			}
 		}

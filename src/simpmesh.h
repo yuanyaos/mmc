@@ -244,6 +244,10 @@ static inline float dist(float3 *p0,float3 *p1){
     return sqrt(dist2(p0,p1));
 }
 
+static inline float dist2d2(float *p0,float *p1){
+    return (p1[0]-p0[0])*(p1[0]-p0[0])+(p1[1]-p0[1])*(p1[1]-p0[1]);
+}
+
 
 static inline float mmc_rsqrtf(float a){
 #ifdef MMC_USE_SSE
