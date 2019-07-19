@@ -894,13 +894,52 @@ float havel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit){
 
 float ray_cylinder_intersect(ray *r, raytracer *tracer, int *ee, int index){
 	float3 u, E0, E1, OP, PP, Pt, PP0, PP1;
+	// float3 E0, E1, Dist, DEBUG3;
 	float norm, normr, st, DIS0, DIS1, pt0[2], pt1[2], theta, ph0[2], ph1[2], Lratio;
+	// float DIS0, DIS1, pt0[2], pt1[2], theta, ph0[2], ph1[2], Lratio, DEBUG;
 	int en0, en1;
+
+	// __m128 U,N,sseP,sseOP,sseP0,sseP1;
 
 	en0 = ee[e2n[r->vesselid[index]][0]]-1;
 	en1 = ee[e2n[r->vesselid[index]][1]]-1;
 	E0 = tracer->mesh->node[en0];
 	E1 = tracer->mesh->node[en1];
+
+	// const __m128 sseE0=_mm_load_ps(&(E0.x));
+	// const __m128 sseE1=_mm_load_ps(&(E1.x));
+
+	// U = _mm_sub_ps(sseE1,sseE0);
+	// N = _mm_dp_ps(sseE0,sseE1,0x7f);
+	// U = _mm_div_ps(U,N);
+
+	// sseP = _mm_load_ps(&(r->p0.x));	// P0
+	// sseOP = _mm_sub_ps(sseP,sseE0);	// OP
+	// N = _mm_dp_ps(sseOP,U,0x7f);	// st
+	// sseP = _mm_mul_ps(U,N);		// Pt
+	// sseP0 = _mm_sub_ps(sseOP,sseP);		// PP0
+	// N = _mm_dp_ps(sseP0,sseP0,0x7f);	// DIS0
+	// _mm_store_ss(&(Dist.x),N);
+	// DIS0 = Dist.x;	
+	// // _mm_store_ss(&(DEBUG3.x),Nx);
+	// // DEBUG = DEBUG3.x;
+	// // printf("DEBUG=%f\n",DEBUG);
+
+	// sseP = _mm_load_ps(&(r->vec.x));
+	// sseOP = _mm_set1_ps(r->Lmove);
+	// sseOP = _mm_mul_ps(sseP,sseOP);
+	// sseP = _mm_load_ps(&(r->p0.x));
+	// sseP = _mm_add_ps(sseP,sseOP);	// P1
+	// sseOP = _mm_sub_ps(sseP,sseE0);
+	// N = _mm_dp_ps(sseOP,U,0x7f);	// st
+	// sseP = _mm_mul_ps(U,N);		// Pt
+	// sseP1 = _mm_sub_ps(sseOP,sseP);		// PP1
+	// N = _mm_dp_ps(sseP1,sseP1,0x7f);	// DIS1
+	// _mm_store_ss(&(Dist.x),N);
+	// DIS1 = Dist.x;
+
+	// _mm_store_ss(&(r->u.x),U);
+	// r->E = E0;
 
 	vec_diff(&E0,&E1,&u);
 	norm = dist(&E0,&E1);	// get coordinates and compute distance between two nodes
@@ -927,14 +966,21 @@ float ray_cylinder_intersect(ray *r, raytracer *tracer, int *ee, int index){
 	// update Lmove and reflection
 	float dx, dy, dr2, drr2, Dt, delta, rt, rt2, sgn, xa, xb, ya, yb, Dp;
 	rt = r->vesselr[index];
-	rt2 = rt*rt;
+	rt2 = rt*rt;	
 	if((DIS0>rt2+EPS2 && DIS1<rt2-EPS2) || (DIS0<rt2-EPS2 && DIS1>rt2+EPS2)) 	// hit vessel out->in or in->out
-	{		    	
+	{		
+		// printf("DIS0=%f DIS1=%f\n",DIS0,DIS1);
 		r->isvessel = 1;
 
 		DIS0 = sqrtf(DIS0);
 		DIS1 = sqrtf(DIS1);
+
+		// N = _mm_dp_ps(sseP0,sseP1,0x7f);	// theta
+		// _mm_store_ss(&(Dist.x),N);
+		// theta = Dist.x;
+
 		theta = vec_dot(&PP0,&PP1);
+
 		theta = theta/(DIS0*DIS1+EPS);
 		pt0[0] = DIS0;
 		pt0[1] = 0;
@@ -1009,7 +1055,7 @@ float ray_sphere_intersect(ray *r, raytracer *tracer, int *ee, int index, float 
 		vec_diff(&cc,&oo,&oc);
 		temp2 = oc.x*oc.x+oc.y*oc.y+oc.z*oc.z-nr2;
 		temp1 = vec_dot(&ll,&oc);
-		temp2 = sqrtf(temp1*temp1-temp2);
+		temp2 = sqrtf(fabs(temp1*temp1-temp2));
 		d1 = -temp1+temp2;
 		d2 = -temp1-temp2;
 		if(npdist0>nr2 && npdist1<nr2){ // out->in

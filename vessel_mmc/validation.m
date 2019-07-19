@@ -9,43 +9,43 @@ addpath('/drives/neza2/users/yaoshen/NEU/Research/mmc/mmc/vessel_mmc/dijkstra')
 
 %% simple
 
-[node,elem] = meshgrid6(0:1,0:1,0:1);
-node = node*60;
-node = [node [1 0 0 0 0 0 0 1]'];
-pse(1) = 1;
-pse(2) = 8;
-[vessel,vesseln,pathelem,nodeelem] = vessellabel(elem,node,pse,2,0);
-elem = [elem vessel 6*ones(size(vessel)) ones(size(vessel)) ones(size(vessel))];
+% [node,elem] = meshgrid6(0:1,0:1,0:1);
+% node = node*60;
+% node = [node [1 0 0 0 0 0 0 1]'];
+% pse(1) = 1;
+% pse(2) = 8;
+% [vessel,vesseln,pathelem,nodeelem] = vessellabel(elem,node,pse,2,0);
+% elem = [elem vessel 6*ones(size(vessel)) ones(size(vessel)) ones(size(vessel))];
 
 %% complex
 
-% [node,face,elem]=meshabox([0 0 0],[50 60 70],1000,1000);
-% elem = elem(:,1:4);
-% % eleuniq = unique(elem(:));
-% % pse = round(rand(2,1)*length(eleuniq));
-% pse(1) = 56;
-% pse(2) = 2;
-% [vessel1,vesseln1,pathelem1,nodeelem1] = vessellabel(elem,node,pse,2,0);
-% 
-% pse(1) = 70;
-% pse(2) = 8;
-% [vessel2,vesseln2,pathelem2,nodeelem2] = vessellabel(elem,node,pse,1,0);
-% 
-% % combine
-% vd = vessel1-vessel2;
-% i1 = find(vd==0);
-% i2 = find(vessel2~=6);
-% i2 = intersect(i1,i2);  % overlap local index
-% vessel2(i2) = 6;
-% vessel = [vessel1 vessel2 2*ones(size(vessel1)) 1*ones(size(vessel2))];
-% 
-% vesseln = [vesseln1, vesseln2];
-% vesseln = max(vesseln,[],2);
+[node,face,elem]=meshabox([0 0 0],[50 60 70],1000,1000);
+elem = elem(:,1:4);
+% eleuniq = unique(elem(:));
+% pse = round(rand(2,1)*length(eleuniq));
+pse(1) = 56;
+pse(2) = 2;
+[vessel1,vesseln1,pathelem1,nodeelem1] = vessellabel(elem,node,pse,2,0);
 
+pse(1) = 70;
+pse(2) = 8;
+[vessel2,vesseln2,pathelem2,nodeelem2] = vessellabel(elem,node,pse,2,0);
+
+% combine
+vd = vessel1-vessel2;
+i1 = find(vd==0);
+i2 = find(vessel2~=6);
+i2 = intersect(i1,i2);  % overlap local index
+vessel2(i2) = 6;
+elem = [elem vessel1 vessel2 2*ones(size(vessel1)) 1*ones(size(vessel2))];
+
+vesseln = [vesseln1, vesseln2];
+vesseln = max(vesseln,[],2);
+node = [node vesseln];
 %% run mmc
 
 clear cfg
-cfg.nphoton=1e6;
+cfg.nphoton=1e8;
 cfg.node = node;
 % cfg.node = [cfg.node vesseln];
 cfg.elem = elem;
@@ -92,25 +92,25 @@ title(['With connection, slice=' num2str(n)]),colormap jet
 
 %% Compare original MMC and vessel MMC
 
-n = 20;
-[xx,yy]=meshgrid(0:60,0:60); 
+n = 35;
+[xx,yy]=meshgrid(0:60,0:50); 
 xx = xx'; yy = yy';
 
 levels = -5:0.5:8;
 figure,
-load /drives/neza2/users/yaoshen/NEU/Research/mmc/flux_originaln685
+load /drives/neza2/users/yaoshen/NEU/Research/mmc/cpu_2vessel
 flux_original = rot90(squeeze(flux.data(:,:,n)),-1);
 ax1 = subplot(131);
 imagesc(log10(flux_original),[2 5]);
-title(['Original, slice=' num2str(n)])
+title(['CPU, slice=' num2str(n)])
 colormap(ax1,jet)
 
 clear flux
-load /drives/neza2/users/yaoshen/NEU/Research/mmc/flux_vesseln685
+load /drives/neza2/users/yaoshen/NEU/Research/mmc/gpu_2vessel
 flux_vessel = rot90(squeeze(flux.data(:,:,n)),-1);
 ax2 = subplot(132);
 imagesc(log10(flux_vessel),[2 5]);
-title(['Vessel, slice=' num2str(n)])
+title(['GPU, slice=' num2str(n)])
 colormap(ax2,jet)
 
 ax3 = subplot(133);

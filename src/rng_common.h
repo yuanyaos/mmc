@@ -33,6 +33,7 @@
 #define TWO_PI     (M_PI*2.0)
 #define EPS        1e-6f
 #define EPS2       10*EPS
+#define INF        10000000
 
 //! generate [0,1] random number for the next scattering length
 __device__ float rand_next_scatlen(RandType t[RAND_BUF_LEN]){
