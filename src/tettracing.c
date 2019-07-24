@@ -923,7 +923,6 @@ float ray_cylinder_intersect(ray *r, raytracer *tracer, int *ee, int index){
 	// DIS0 = Dist.x;	
 	// // _mm_store_ss(&(DEBUG3.x),Nx);
 	// // DEBUG = DEBUG3.x;
-	// // printf("DEBUG=%f\n",DEBUG);
 
 	// sseP = _mm_load_ps(&(r->vec.x));
 	// sseOP = _mm_set1_ps(r->Lmove);
@@ -969,7 +968,6 @@ float ray_cylinder_intersect(ray *r, raytracer *tracer, int *ee, int index){
 	rt2 = rt*rt;	
 	if((DIS0>rt2+EPS2 && DIS1<rt2-EPS2) || (DIS0<rt2-EPS2 && DIS1>rt2+EPS2)) 	// hit vessel out->in or in->out
 	{		
-		// printf("DIS0=%f DIS1=%f\n",DIS0,DIS1);
 		r->isvessel = 1;
 
 		DIS0 = sqrtf(DIS0);
@@ -1148,11 +1146,10 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	if(r->faceid>=0 && bary.x>=0){
 	    medium *prop;
 	    int *enb, *ee=(int *)(tracer->mesh->elem+eid*tracer->mesh->elemlen);
-	    int last, hit=0;
+	    int hit=0;
 	    float mus;
 	    if(r->inout){
-	    	last=2;
-	    	prop=tracer->mesh->med+last;
+	    	prop=tracer->mesh->med+cfg->his.maxmedia;
 	    }else{
 	    	prop=tracer->mesh->med+(tracer->mesh->type[eid]);
 	    }
@@ -1457,7 +1454,7 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	    if(cfg->issavedet && r.Lmove>0.f && mesh->type[r.eid-1]>0 && r.faceid>=0)
 	            r.partialpath[mesh->prop-1+mesh->type[r.eid-1]]+=r.Lmove;  /*second medianum block is the partial path*/
 	    
-	    if(cfg->isreflect && r.isvessel && (mesh->med[2].n != mesh->med[mesh->type[r.eid-1]].n)){
+	    if(cfg->isreflect && r.isvessel && (mesh->med[cfg->his.maxmedia].n != mesh->med[mesh->type[r.eid-1]].n)){
 	    	    reflectvessel(cfg,&r.vec,&r.u,&r.p0,&r.E,tracer,&r.eid,&r.inout,ran,r.isvessel);
 	    	    vec_mult_add(&r.p0,&r.vec,1.0f,10*EPS,&r.p0);
 	    	    continue;
@@ -1639,7 +1636,6 @@ float reflectvessel(mcconfig *cfg,float3 *c0,float3 *u,float3 *ph,float3 *E0,ray
 	/*to handle refractive index mismatch*/
         float3 pnorm={0.f}, *pn=&pnorm, EH, ut;
 	float Icos,Re,Im,Rtotal,tmp0,tmp1,tmp2,n1,n2;
-	int last;
 
 	if(isvessel==1){	// hit edge vessel
 		vec_diff(E0,ph,&EH);
@@ -1659,16 +1655,12 @@ float reflectvessel(mcconfig *cfg,float3 *c0,float3 *u,float3 *ph,float3 *E0,ray
 	// /*compute the cos of the incidence angle*/
         Icos=fabs(vec_dot(c0,pn));
 
-        // last = sizeof(tracer->mesh->med)/sizeof(tracer->mesh->med[0]);
-        last = 2;
         if(*inout){	// out->in
         	n1 = tracer->mesh->med[tracer->mesh->type[*eid-1]].n;
-        	n2 = tracer->mesh->med[last].n;
-        	// printf("out2in %d: n1=%f, n2=%f\n",*inout,n1,n2);
+        	n2 = tracer->mesh->med[cfg->his.maxmedia].n;
         }else{		// in->out
-        	n1 = tracer->mesh->med[last].n;
+        	n1 = tracer->mesh->med[cfg->his.maxmedia].n;
 		n2 = tracer->mesh->med[tracer->mesh->type[*eid-1]].n;
-		// printf("in2out %d: n1=%f, n2=%f\n",*inout,n1,n2);
         }
 
 	tmp0=n1*n1;
@@ -1699,7 +1691,6 @@ float reflectvessel(mcconfig *cfg,float3 *c0,float3 *u,float3 *ph,float3 *E0,ray
        }
        tmp0=1.f/sqrt(vec_dot(c0,c0));
        vec_mult(c0,tmp0,c0);
-       // printf("After c0x=%f c0y=%f c0z=%f inout=%d\n",c0->x,c0->y,c0->z,*inout);
        return 1.f;
 }
 
