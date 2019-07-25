@@ -1459,6 +1459,8 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	    	    vec_mult_add(&r.p0,&r.vec,1.0f,10*EPS,&r.p0);
 	    	    continue;
 	    }
+	    else if(r.isvessel)
+	    	continue;
 
 	    /*move a photon until the end of the current scattering path*/
 	    while(r.faceid>=0 && !r.isend){
@@ -1569,6 +1571,13 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 		}else
 			break;
 	    }
+	    if(cfg->isreflect && r.isvessel && (mesh->med[cfg->his.maxmedia].n != mesh->med[mesh->type[r.eid-1]].n)){
+	    	    reflectvessel(cfg,&r.vec,&r.u,&r.p0,&r.E,tracer,&r.eid,&r.inout,ran,r.isvessel);
+	    	    vec_mult_add(&r.p0,&r.vec,1.0f,10*EPS,&r.p0);
+	    	    continue;
+	    }
+	    else if(r.isvessel)
+	    	continue;
             mom=0.f;
 	    r.slen0=mc_next_scatter(mesh->med[mesh->type[r.eid-1]].g,&r.vec,ran,ran0,cfg,&mom);
 	    r.slen=r.slen0;
