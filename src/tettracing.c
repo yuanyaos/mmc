@@ -23,7 +23,6 @@
 
 /***************************************************************************//**
 \file    tettracing.c
-
 \brief   Core unit for mash-based photon transport using ray tracing algorithms
 *******************************************************************************/
 
@@ -1667,6 +1666,7 @@ float reflectvessel(mcconfig *cfg,float3 *c0,float3 *u,float3 *ph,float3 *E0,ray
         if(*inout){	// out->in
         	n1 = tracer->mesh->med[tracer->mesh->type[*eid-1]].n;
         	n2 = tracer->mesh->med[cfg->his.maxmedia].n;
+        	vec_mult(pn,-1.f,pn);
         }else{		// in->out
         	n1 = tracer->mesh->med[cfg->his.maxmedia].n;
 		n2 = tracer->mesh->med[tracer->mesh->type[*eid-1]].n;

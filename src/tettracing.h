@@ -23,7 +23,6 @@
 
 /***************************************************************************//**
 \file    tettracing.h
-
 \brief   Definition of the core ray-tracing functions
 *******************************************************************************/
 
@@ -39,7 +38,6 @@
 /***************************************************************************//**
 \struct MMC_ray tettracing.h
 \brief  Data structure associated with the current photon/ray
-
 *******************************************************************************/   
 
 typedef struct MMC_ray{
@@ -75,7 +73,6 @@ typedef struct MMC_ray{
 /***************************************************************************//**
 \struct MMC_visitor tettracing.h
 \brief  A structure that accumulates the statistics about the simulation
-
 *******************************************************************************/  
 
 typedef struct MMC_visitor{

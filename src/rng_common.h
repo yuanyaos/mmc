@@ -32,7 +32,7 @@
 
 #define TWO_PI     (M_PI*2.0)
 #define EPS        1e-6f
-#define EPS2       10*EPS
+#define EPS2       100*EPS
 #define INF        10000000
 
 //! generate [0,1] random number for the next scattering length
