@@ -1069,6 +1069,7 @@ float ray_sphere_intersect(ray *r, raytracer *tracer, int *ee, int index, float 
 	}
 	else if((npdist0>=nr2 && npdist1<=nr2) || (npdist0<nr2 && npdist1<nr2)){
 		r->inout = 1;
+		return 1;
 	}else{
 
 	}
