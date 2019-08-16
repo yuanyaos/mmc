@@ -905,40 +905,6 @@ float ray_cylinder_intersect(ray *r, raytracer *tracer, int *ee, int index){
 	E0 = tracer->mesh->node[en0];
 	E1 = tracer->mesh->node[en1];
 
-	// const __m128 sseE0=_mm_load_ps(&(E0.x));
-	// const __m128 sseE1=_mm_load_ps(&(E1.x));
-
-	// U = _mm_sub_ps(sseE1,sseE0);
-	// N = _mm_dp_ps(sseE0,sseE1,0x7f);
-	// U = _mm_div_ps(U,N);
-
-	// sseP = _mm_load_ps(&(r->p0.x));	// P0
-	// sseOP = _mm_sub_ps(sseP,sseE0);	// OP
-	// N = _mm_dp_ps(sseOP,U,0x7f);	// st
-	// sseP = _mm_mul_ps(U,N);		// Pt
-	// sseP0 = _mm_sub_ps(sseOP,sseP);		// PP0
-	// N = _mm_dp_ps(sseP0,sseP0,0x7f);	// DIS0
-	// _mm_store_ss(&(Dist.x),N);
-	// DIS0 = Dist.x;	
-	// // _mm_store_ss(&(DEBUG3.x),Nx);
-	// // DEBUG = DEBUG3.x;
-
-	// sseP = _mm_load_ps(&(r->vec.x));
-	// sseOP = _mm_set1_ps(r->Lmove);
-	// sseOP = _mm_mul_ps(sseP,sseOP);
-	// sseP = _mm_load_ps(&(r->p0.x));
-	// sseP = _mm_add_ps(sseP,sseOP);	// P1
-	// sseOP = _mm_sub_ps(sseP,sseE0);
-	// N = _mm_dp_ps(sseOP,U,0x7f);	// st
-	// sseP = _mm_mul_ps(U,N);		// Pt
-	// sseP1 = _mm_sub_ps(sseOP,sseP);		// PP1
-	// N = _mm_dp_ps(sseP1,sseP1,0x7f);	// DIS1
-	// _mm_store_ss(&(Dist.x),N);
-	// DIS1 = Dist.x;
-
-	// _mm_store_ss(&(r->u.x),U);
-	// r->E = E0;
-
 	vec_diff(&E0,&E1,&u);
 	norm = dist(&E0,&E1);	// get coordinates and compute distance between two nodes
 	normr = 1.0f/norm;
@@ -971,10 +937,6 @@ float ray_cylinder_intersect(ray *r, raytracer *tracer, int *ee, int index){
 
 		DIS0 = sqrtf(DIS0);
 		DIS1 = sqrtf(DIS1);
-
-		// N = _mm_dp_ps(sseP0,sseP1,0x7f);	// theta
-		// _mm_store_ss(&(Dist.x),N);
-		// theta = Dist.x;
 
 		theta = vec_dot(&PP0,&PP1);
 
@@ -1152,9 +1114,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	    	prop=tracer->mesh->med+cfg->his.maxmedia;
 	    }else{
 	    	prop=tracer->mesh->med+(tracer->mesh->type[eid]);
-	    }
-	    // if(r->vesselid>5)
-	    // 	prop=tracer->mesh->med+(tracer->mesh->type[eid]);
+	    }    
 
 	    rc=prop->n*R_C0;
             currweight=r->weight;
@@ -1189,13 +1149,13 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 				  break;
 			}
 		}
-	    }else if(tracer->mesh->implicit==2){
+	    }else if(tracer->mesh->implicit==2 && r->vesselr[0]){
 	    	float3 pf0,pf1,pv,fnorm,ptemp;
 	    	float distf0,distf1,thick,lm=0,Rtemp;
-	    	int fid,flag;
-	    	// const int nc[4][3]={{3,0,1},{3,1,2},{2,0,3},{1,0,2}};	    	
+	    	int fid,flag=0;
+	    	// const int nc[4][3]={{3,0,1},{3,1,2},{2,0,3},{1,0,2}};
 	    	thick = r->vesselr[0];
-	    	Rtemp = 1e9f;
+    		Rtemp = 1e9f;
 	    	pf0 = r->p0;		// P0
 	    	vec_mult(&r->vec,r->Lmove,&ptemp);
 		vec_add(&r->p0,&ptemp,&ptemp);		// P1
@@ -1212,7 +1172,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	    		distf1 = vec_dot(&pv,&fnorm);
 
 	    		if(distf0>thick+EPS2 && distf1<thick-EPS2){	// out->in
-	    			flag = 1;	    			
+	    			flag = 1;
 	    			lm = 1-(thick-distf1)/(distf0-distf1);
 	    		}else if(distf0<thick-EPS2 && distf1>thick+EPS2){	// in->out
 	    			flag = 2;
@@ -1226,7 +1186,6 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	    		}else{
 
 	    		}
-
 	    		if(lm<Rtemp){
 	    			r->faceindex = fid;
 	    			Rtemp = lm;
@@ -1235,35 +1194,11 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	    			else
 	    				r->inout = 0;
 	    		}
-
 	    	}
-
-	    	if(Rtemp<1.f){
+	    	if(Rtemp<1.f)
 	    		r->isvessel = 3;
-	    		// r->inout = !r->inout;
-	  //   		vec_mult(&r->vec,Rtemp*r->Lmove+EPS2,&ptemp);
-			// vec_add(&r->p0,&ptemp,&ptemp);
-			// flag = 0;
-			// for(fid=0;fid<4;fid++){
-			// 	pf1 = tracer->mesh->node[ee[nc[fid][0]]-1];
-			//     	fnorm.x=(&(tracer->n[baseid].x))[fid];
-			// 	fnorm.y=(&(tracer->n[baseid].x))[fid+4];
-			// 	fnorm.z=(&(tracer->n[baseid].x))[fid+8];
 
-		 //    		vec_diff(&ptemp,&pf1,&pv);
-		 //    		distf0 = vec_dot(&pv,&fnorm);
-
-		 //    		if(distf0<thick){
-		 //    			flag = 1;
-		 //    			break;
-		 //    		}
-			// }
-	  //   		if(flag)
-	  //   			r->inout = 1;
-	  //   		else
-	  //   			r->inout = 0;
-	    	}
-	    	r->Lmove = r->Lmove*Rtemp;
+	    	r->Lmove = r->Lmove*Rtemp;	    	
 	    }
 
             O = _mm_load_ps(&(r->vec.x));
@@ -1528,7 +1463,7 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	            r.partialpath[mesh->prop-1+mesh->type[r.eid-1]]+=r.Lmove;  /*second medianum block is the partial path*/
 	    
 	    if(cfg->isreflect && r.isvessel && (mesh->med[cfg->his.maxmedia].n != mesh->med[mesh->type[r.eid-1]].n)){
-	    	    reflectvessel(cfg,&r.vec,&r.u,&r.p0,&r.E,tracer,&r.eid,&r.inout,ran,r.isvessel,r.faceindex);
+	    	    reflectvessel(cfg,&r.vec,&r.u,&r.p0,&r.E,tracer,&r.eid,&r.inout,ran,r.isvessel,&r.faceindex);
 	    	    vec_mult_add(&r.p0,&r.vec,1.0f,10*EPS,&r.p0);
 	    	    continue;
 	    }
@@ -1641,7 +1576,7 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 			break;
 	    }
 	    if(cfg->isreflect && r.isvessel && (mesh->med[cfg->his.maxmedia].n != mesh->med[mesh->type[r.eid-1]].n)){
-	    	    reflectvessel(cfg,&r.vec,&r.u,&r.p0,&r.E,tracer,&r.eid,&r.inout,ran,r.isvessel,r.faceindex);
+	    	    reflectvessel(cfg,&r.vec,&r.u,&r.p0,&r.E,tracer,&r.eid,&r.inout,ran,r.isvessel,&r.faceindex);
 	    	    vec_mult_add(&r.p0,&r.vec,1.0f,10*EPS,&r.p0);
 	    	    continue;
 	    }
