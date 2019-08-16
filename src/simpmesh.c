@@ -108,6 +108,7 @@ void mesh_init(tetmesh *mesh){
 	mesh->nmax.y=-VERY_BIG;
 	mesh->nmax.z=-VERY_BIG;
 	mesh->nmax.w=1.f;
+	mesh->implicit=0;
 }
 
 /**
@@ -528,6 +529,7 @@ void mesh_clear(tetmesh *mesh){
 	mesh->nf=0;
         mesh->srcelemlen=0;
         mesh->detelemlen=0;
+        mesh->implicit=0;
 	if(mesh->node){
 		free(mesh->node);
 		mesh->node=NULL;

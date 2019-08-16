@@ -473,10 +473,14 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
   if(mesh->nradius) free(mesh->nradius);
         mesh->nradius=(float  *)malloc(sizeof(float )*mesh->nn);
         for(i=0;i<mesh->nn;i++){
-          mesh->nradius[i]=val[3*mesh->nn+i];          
+          mesh->nradius[i]=val[3*mesh->nn+i];
         }
-           
-    }else if(strcmp(name,"elem")==0){
+    }else if(strcmp(name,"implicit")==0){
+        double *val=mxGetPr(item);
+        mesh->implicit=(int) val[0];
+        printf("mmc.implicit=%d;\n",mesh->implicit);
+    }
+    else if(strcmp(name,"elem")==0){
         arraydim=mxGetDimensions(item);
 	if(arraydim[0]<=0 || arraydim[1]<8)
             MEXERROR("the 'elem' field must have 8 columns (e1,e2,e3,e4,vessel1,vessel2,r1,r2)");

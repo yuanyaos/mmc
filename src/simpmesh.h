@@ -98,6 +98,7 @@ typedef struct MMC_mesh{
 	float *nvol;           /**< voronoi volume of a node */
 	float4 nmin;           /**< lower-corner of the mesh bounding box */
 	float4 nmax;           /**< upper-corner of the mesh bounding box */
+	int implicit;	       /**< 1: call vessel-MMC (edge or node), 2: call face-MMC */
 } tetmesh;
 
 /***************************************************************************//**

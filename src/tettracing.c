@@ -1045,7 +1045,7 @@ float ray_sphere_intersect(ray *r, raytracer *tracer, int *ee, int index, float 
 	vec_mult(&r->vec,r->Lmove,&PP);
 	vec_add(&r->p0,&PP,&PP);
 	npdist1=dist2(&PP,&cc);			// P1
-	if((npdist0>nr2+10*EPS && npdist1<nr2-10*EPS) || (npdist0<nr2-10*EPS && npdist1>nr2+10*EPS)){
+	if((npdist0>nr2+EPS2 && npdist1<nr2-EPS2) || (npdist0<nr2-EPS2 && npdist1>nr2+EPS2)){
 		r->isvessel = 2;
 		oo = r->p0;
 		ll = r->vec;
@@ -1170,23 +1170,100 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	    r->isend=(Lp0>dlen);
 	    r->Lmove=((r->isend) ? dlen : Lp0);
 
-	    if(r->vesselid[0]<6 && !hit){	// vesselid==6: there is no edge labeled as vessel in the current element		
+	    if(tracer->mesh->implicit==1){
+		if(r->vesselid[0]<6 && !hit){	// vesselid==6: there is no edge labeled as vessel in the current element		
 		// update r->isvessel, r->inout, r->u, r->E0, r->Lmove
 		hit = ray_cylinder_intersect(r, tracer, ee, 0);
-	    }else if(r->vesselid[1]<6 && !hit){
-	    	// update r->isvessel, r->inout, r->u, r->E0, r->Lmove
+		}else if(r->vesselid[1]<6 && !hit){
+			// update r->isvessel, r->inout, r->u, r->E0, r->Lmove
 		hit = ray_cylinder_intersect(r, tracer, ee, 1);
-	    }
-	    else if(!hit){	// not hit any vessel in the current element
-	    	float nr;
-		for(int ih=0;ih<4;ih++){	// check if hits any node vessel
-			nr = tracer->mesh->nradius[ee[ih]-1];
-			if(!nr)
-			  continue;
-			hit = ray_sphere_intersect(r, tracer, ee, ih, nr);
-			if(hit)
-			  break;
 		}
+		else if(!hit){	// not hit any vessel in the current element
+			float nr;
+			for(int ih=0;ih<4;ih++){	// check if hits any node vessel
+				nr = tracer->mesh->nradius[ee[ih]-1];
+				if(!nr)
+				  continue;
+				hit = ray_sphere_intersect(r, tracer, ee, ih, nr);
+				if(hit)
+				  break;
+			}
+		}
+	    }else if(tracer->mesh->implicit==2){
+	    	float3 pf0,pf1,pv,fnorm,ptemp;
+	    	float distf0,distf1,thick,lm=0,Rtemp;
+	    	int fid,flag;
+	    	// const int nc[4][3]={{3,0,1},{3,1,2},{2,0,3},{1,0,2}};	    	
+	    	thick = r->vesselr[0];
+	    	Rtemp = 1e9f;
+	    	pf0 = r->p0;		// P0
+	    	vec_mult(&r->vec,r->Lmove,&ptemp);
+		vec_add(&r->p0,&ptemp,&ptemp);		// P1
+	    	for(fid=0;fid<4;fid++){
+	    		pf1 = tracer->mesh->node[ee[nc[fid][0]]-1];
+		    	fnorm.x=(&(tracer->n[baseid].x))[fid];
+			fnorm.y=(&(tracer->n[baseid].x))[fid+4];
+			fnorm.z=(&(tracer->n[baseid].x))[fid+8];
+
+	    		vec_diff(&pf0,&pf1,&pv);
+	    		distf0 = vec_dot(&pv,&fnorm);
+
+	    		vec_diff(&ptemp,&pf1,&pv);
+	    		distf1 = vec_dot(&pv,&fnorm);
+
+	    		if(distf0>thick+EPS2 && distf1<thick-EPS2){	// out->in
+	    			flag = 1;	    			
+	    			lm = 1-(thick-distf1)/(distf0-distf1);
+	    		}else if(distf0<thick-EPS2 && distf1>thick+EPS2){	// in->out
+	    			flag = 2;
+	    			lm = (thick-distf0)/(distf1-distf0);
+	    		}else if((distf0<=thick && distf1>=thick) || (distf0>thick && distf1>thick)){
+	    			flag = 3;
+	    			lm = 1;
+	    		}else if((distf0>=thick && distf1<=thick) || (distf0<thick && distf1<thick)){
+	    			flag = 4;
+	    			lm = 1;
+	    		}else{
+
+	    		}
+
+	    		if(lm<Rtemp){
+	    			r->faceindex = fid;
+	    			Rtemp = lm;
+	    			if(flag==1 || flag==4)
+	    				r->inout = 1;
+	    			else
+	    				r->inout = 0;
+	    		}
+
+	    	}
+
+	    	if(Rtemp<1.f){
+	    		r->isvessel = 3;
+	    		// r->inout = !r->inout;
+	  //   		vec_mult(&r->vec,Rtemp*r->Lmove+EPS2,&ptemp);
+			// vec_add(&r->p0,&ptemp,&ptemp);
+			// flag = 0;
+			// for(fid=0;fid<4;fid++){
+			// 	pf1 = tracer->mesh->node[ee[nc[fid][0]]-1];
+			//     	fnorm.x=(&(tracer->n[baseid].x))[fid];
+			// 	fnorm.y=(&(tracer->n[baseid].x))[fid+4];
+			// 	fnorm.z=(&(tracer->n[baseid].x))[fid+8];
+
+		 //    		vec_diff(&ptemp,&pf1,&pv);
+		 //    		distf0 = vec_dot(&pv,&fnorm);
+
+		 //    		if(distf0<thick){
+		 //    			flag = 1;
+		 //    			break;
+		 //    		}
+			// }
+	  //   		if(flag)
+	  //   			r->inout = 1;
+	  //   		else
+	  //   			r->inout = 0;
+	    	}
+	    	r->Lmove = r->Lmove*Rtemp;
 	    }
 
             O = _mm_load_ps(&(r->vec.x));
@@ -1202,11 +1279,11 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	       r->Lmove=(cfg->tend-r->photontimer)/(prop->n*R_C0)-1e-4f;
 	    }
             if(cfg->mcmethod==mmMCX){
-#ifdef __INTEL_COMPILER
+// #ifdef __INTEL_COMPILER
 	       totalloss=expf(-prop->mua*r->Lmove);
-#else
-	       totalloss=fast_expf9(-prop->mua*r->Lmove);
-#endif
+// #else
+	       // totalloss=fast_expf9(-prop->mua*r->Lmove);
+// #endif
                r->weight*=totalloss;
             }
 	    totalloss=1.f-totalloss;
@@ -1374,7 +1451,7 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
         float mom;
 	float kahany, kahant;
 	//	p0          vec                                         pout                    bary0     eid      faceid      isend                      photonid     focus           oldidx              vesselr
-	ray r={cfg->srcpos,{cfg->srcdir.x,cfg->srcdir.y,cfg->srcdir.z},{MMC_UNDEFINED,0.f,0.f},cfg->bary0,cfg->e0,cfg->dim.y-1,0,0,1.f,0.f,0.f,0.f,0.f,0.,0,NULL,NULL,cfg->srcdir.w,0,0xFFFFFFFF,0.0,{0,0},{0.f,0.f},0,0,{0.f,0.f,0.f},{0.f,0.f,0.f}};
+	ray r={cfg->srcpos,{cfg->srcdir.x,cfg->srcdir.y,cfg->srcdir.z},{MMC_UNDEFINED,0.f,0.f},cfg->bary0,cfg->e0,cfg->dim.y-1,0,0,1.f,0.f,0.f,0.f,0.f,0.,0,NULL,NULL,cfg->srcdir.w,0,0xFFFFFFFF,0.0,{0,0},{0.f,0.f},0,0,{0.f,0.f,0.f},{0.f,0.f,0.f},0};
 
 	float (*engines[5])(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit)=
 	       {plucker_raytet,havel_raytet,badouel_raytet,branchless_badouel_raytet,branchless_badouel_raytet};
@@ -1430,10 +1507,6 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 #endif	
 	while(1){  /*propagate a photon until exit*/
 
-	     // vid = (int *)(mesh->vessel+(r.eid-1));
-	     // r.vesselid = *vid;
-	     // vr = (float *)(mesh->radius+(r.eid-1));
-	     // r.vesselr = *vr;
 	     vid = (int *)(mesh->vessel+(r.eid-1)*2);
 	     r.vesselid[0] = vid[0];
 	     r.vesselid[1] = vid[1];
@@ -1455,7 +1528,7 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	            r.partialpath[mesh->prop-1+mesh->type[r.eid-1]]+=r.Lmove;  /*second medianum block is the partial path*/
 	    
 	    if(cfg->isreflect && r.isvessel && (mesh->med[cfg->his.maxmedia].n != mesh->med[mesh->type[r.eid-1]].n)){
-	    	    reflectvessel(cfg,&r.vec,&r.u,&r.p0,&r.E,tracer,&r.eid,&r.inout,ran,r.isvessel);
+	    	    reflectvessel(cfg,&r.vec,&r.u,&r.p0,&r.E,tracer,&r.eid,&r.inout,ran,r.isvessel,r.faceindex);
 	    	    vec_mult_add(&r.p0,&r.vec,1.0f,10*EPS,&r.p0);
 	    	    continue;
 	    }
@@ -1498,10 +1571,6 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	    	    if(r.pout.x!=MMC_UNDEFINED && (cfg->debuglevel&dlMove))
 	    		MMC_FPRINTF(cfg->flog,"P %f %f %f %d %lu %e\n",r.pout.x,r.pout.y,r.pout.z,r.eid,id,r.slen);
 
-	    	    // vid = (int *)(mesh->vessel+(r.eid-1));
-		    // r.vesselid = *vid;
-		    // vr = (float *)(mesh->radius+(r.eid-1));
-		    // r.vesselr = *vr;
 	    	    vid = (int *)(mesh->vessel+(r.eid-1)*2);
 	     	    r.vesselid[0] = vid[0];
 	     	    r.vesselid[1] = vid[1];
@@ -1572,7 +1641,7 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 			break;
 	    }
 	    if(cfg->isreflect && r.isvessel && (mesh->med[cfg->his.maxmedia].n != mesh->med[mesh->type[r.eid-1]].n)){
-	    	    reflectvessel(cfg,&r.vec,&r.u,&r.p0,&r.E,tracer,&r.eid,&r.inout,ran,r.isvessel);
+	    	    reflectvessel(cfg,&r.vec,&r.u,&r.p0,&r.E,tracer,&r.eid,&r.inout,ran,r.isvessel,r.faceindex);
 	    	    vec_mult_add(&r.p0,&r.vec,1.0f,10*EPS,&r.p0);
 	    	    continue;
 	    }
@@ -1640,7 +1709,7 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
  * \param[in,out] ran: the random number generator states
  */
 
-float reflectvessel(mcconfig *cfg,float3 *c0,float3 *u,float3 *ph,float3 *E0,raytracer *tracer,int *eid,int *inout,RandType *ran,int isvessel){
+float reflectvessel(mcconfig *cfg,float3 *c0,float3 *u,float3 *ph,float3 *E0,raytracer *tracer,int *eid,int *inout,RandType *ran,int isvessel,int *faceindex){
 
 	/*to handle refractive index mismatch*/
         float3 pnorm={0.f}, *pn=&pnorm, EH, ut;
@@ -1653,10 +1722,15 @@ float reflectvessel(mcconfig *cfg,float3 *c0,float3 *u,float3 *ph,float3 *E0,ray
 		vec_diff(&ut,&EH,pn);
 		tmp0=1.f/sqrt(vec_dot(pn,pn));
 		vec_mult(pn,tmp0,pn);
-	}else{		// isvessel==2, hit node vessel
+	}else if(isvessel==2){	// isvessel==2, hit node vessel
 		vec_diff(E0,ph,pn);
 		tmp0=1.f/sqrt(vec_dot(pn,pn));
 		vec_mult(pn,tmp0,pn);
+	}else{
+		int baseid = (*eid-1)<<2;
+		pn->x=(&(tracer->n[baseid].x))[*faceindex];
+		pn->y=(&(tracer->n[baseid].x))[*faceindex+4];
+		pn->z=(&(tracer->n[baseid].x))[*faceindex+8];
 	}
 		
 	/*pn pointing outward*/

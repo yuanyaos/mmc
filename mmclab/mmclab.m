@@ -241,8 +241,8 @@ for i=1:len
     if(~isfield(cfg(i),'node') || ~isfield(cfg(i),'elem'))
         error('cfg.node or cfg.elem is missing');
     end
-    if(isfield(cfg(i),'vessel'))
-        if(cfg(i).vessel)
+    if(isfield(cfg(i),'implicit'))
+        if(cfg(i).implicit)
             if(size(cfg(i).node,2)<4 || size(cfg(i).elem,2)<5)
                 error('cfg.node must contain 4 columns and cfg.elem must contain 8 columns');                
             end
@@ -337,8 +337,8 @@ for i=1:len
         error('cfg.prop field is missing or insufficient');
     end
     
-    if(isfield(cfg(i),'vessel'))
-        if(cfg(i).vessel)
+    if(isfield(cfg(i),'implicit'))
+        if(cfg(i).implicit)
             cfg(i).node = [cfg(i).node vesseln];
             cfg(i).elem = [cfg(i).elem vessel vesselr];
         end
