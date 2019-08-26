@@ -236,6 +236,7 @@ if(~isstruct(cfg))
 end
 
 reorient=[0 2 1 4 3 5 6];
+reorient_face=[3 1 2 0 4 5 6];
 len=length(cfg);
 for i=1:len
     if(~isfield(cfg(i),'node') || ~isfield(cfg(i),'elem'))
@@ -243,12 +244,12 @@ for i=1:len
     end
     if(isfield(cfg(i),'implicit'))
         if(cfg(i).implicit)
-            if(size(cfg(i).node,2)<4 || size(cfg(i).elem,2)<5)
-                error('cfg.node must contain 4 columns and cfg.elem must contain 8 columns');                
+            if(size(cfg(i).node,2)<4 || size(cfg(i).elem,2)<12)
+                error('cfg.node must contain 4 columns and cfg.elem must contain 12 columns');                
             end
             vesseln = cfg(i).node(:,4);
-            vessel = cfg(i).elem(:,5:6);
-            vesselr = cfg(i).elem(:,7:8);
+            vessel = cfg(i).elem(:,5:8);
+            vesselr = cfg(i).elem(:,9:12);
             cfg(i).node = cfg(i).node(:,1:3);
             cfg(i).elem = cfg(i).elem(:,1:4);
         end
@@ -258,7 +259,11 @@ for i=1:len
     end
     if(~isfield(cfg(i),'isreoriented') || isempty(cfg(i).isreoriented) || cfg(i).isreoriented==0)
         [cfg(i).elem,~,idx]=meshreorient(cfg(i).node,cfg(i).elem(:,1:4));
-        vessel(idx,:) = reorient(vessel(idx,:)+1);
+        if(cfg(i).implicit==1)
+            vessel(idx,:) = reorient(vessel(idx,:)+1);
+        elseif(cfg(i).implicit==2)
+            vessel(idx,:) = reorient_face(vessel(idx,:)+1);
+        end
         cfg(i).isreoriented=1;
     end
     if(~isfield(cfg(i),'facenb') || isempty(cfg(i).facenb))
@@ -310,7 +315,11 @@ for i=1:len
             [cfg(i).node,cfg(i).elem] = mmcaddsrc(cfg(i).node,cfg(i).elem,sdom);
             cfg(i).elemprop=cfg(i).elem(:,5);
             [cfg(i).elem,~,idx]=meshreorient(cfg(i).node,cfg(i).elem(:,1:4));
-            vessel(idx,:) = reorient(vessel(idx,:)+1);
+            if(cfg(i).implicit==1)
+                vessel(idx,:) = reorient(vessel(idx,:)+1);
+            elseif(cfg(i).implicit==2)
+                vessel(idx,:) = reorient_face(vessel(idx,:)+1);
+            end
             cfg(i).facenb=faceneighbors(cfg(i).elem);
             cfg(i).evol=elemvolume(cfg(i).node,cfg(i).elem);
             cfg(i).isreoriented=1;

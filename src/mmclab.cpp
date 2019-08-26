@@ -495,15 +495,15 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
              mesh->elem[i*mesh->elemlen+j]=val[j*mesh->ne+i];
         printf("mmc.elem=[%d,%d];\n",mesh->ne,mesh->elemlen);
   if(mesh->vessel) free(mesh->vessel);
-        mesh->vessel=(int *)calloc(sizeof(int)*2,mesh->ne);
-        for(j=4;j<6;j++)
+        mesh->vessel=(int *)calloc(sizeof(int)*4,mesh->ne);
+        for(j=4;j<8;j++)
           for(i=0;i<mesh->ne;i++)
-            mesh->vessel[i*2+(j-4)]=val[j*mesh->ne+i];        
+            mesh->vessel[i*4+(j-4)]=val[j*mesh->ne+i];        
   if(mesh->radius) free(mesh->radius);
-        mesh->radius=(float *)calloc(sizeof(float)*2,mesh->ne);
-        for(j=6;j<8;j++)
+        mesh->radius=(float *)calloc(sizeof(float)*4,mesh->ne);
+        for(j=8;j<12;j++)
           for(i=0;i<mesh->ne;i++)
-            mesh->radius[i*2+(j-6)]=val[j*mesh->ne+i];
+            mesh->radius[i*4+(j-8)]=val[j*mesh->ne+i];
     }else if(strcmp(name,"elemprop")==0){
         arraydim=mxGetDimensions(item);
 	if(MAX(arraydim[0],arraydim[1])==0)

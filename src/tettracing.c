@@ -1038,6 +1038,61 @@ float ray_sphere_intersect(ray *r, raytracer *tracer, int *ee, int index, float 
 	return 0;
 }
 
+float ray_face_intersect(ray *r, raytracer *tracer, int *ee, int index, int baseid, int eid){
+	float3 pf0,pf1,pv,fnorm,ptemp;
+	float distf0,distf1,thick,lm=0;
+	int flocal;
+	// float3 tempp1, tempp2;
+
+	flocal = r->vesselid[index];
+	r->faceindex = flocal;
+	thick = r->vesselr[index];
+
+	pf0 = r->p0;		// P0
+	vec_mult(&r->vec,r->Lmove,&ptemp);
+	vec_add(&r->p0,&ptemp,&ptemp);		// P1
+
+	pf1 = tracer->mesh->node[ee[nc[flocal][0]]-1];	// any point on face
+    	fnorm.x=(&(tracer->n[baseid].x))[flocal];		// normal vector of the face
+	fnorm.y=(&(tracer->n[baseid].x))[flocal+4];
+	fnorm.z=(&(tracer->n[baseid].x))[flocal+8];
+	// printf("eid=%d fnorm0=(%f %f %f) fnorm1=(%f %f %f) fnorm2=(%f %f %f) fnorm3=(%f %f %f)\n",eid,(&(tracer->n[baseid].x))[0],(&(tracer->n[baseid].x))[0+4],(&(tracer->n[baseid].x))[0+8],(&(tracer->n[baseid].x))[1],(&(tracer->n[baseid].x))[1+4],(&(tracer->n[baseid].x))[1+8],(&(tracer->n[baseid].x))[2],(&(tracer->n[baseid].x))[2+4],(&(tracer->n[baseid].x))[2+8],(&(tracer->n[baseid].x))[3],(&(tracer->n[baseid].x))[3+4],(&(tracer->n[baseid].x))[3+8]);
+
+	vec_diff(&pf0,&pf1,&pv);
+	distf0 = vec_dot(&pv,&fnorm);
+
+	vec_diff(&ptemp,&pf1,&pv);
+	distf1 = vec_dot(&pv,&fnorm);
+
+	// tempp1 = tracer->mesh->node[ee[nc[flocal][1]]-1];
+	// tempp2 = tracer->mesh->node[ee[nc[flocal][2]]-1];
+	// printf("flocal=%d\n",flocal);
+	// if(eid==3)
+		// printf("eid=%d p0=(%f %f %f) p1=(%f %f %f) p2=(%f %f %f)\n",eid,pf1.x,pf1.y,pf1.z,tempp1.x,tempp1.y,tempp1.z,tempp2.x,tempp2.y,tempp2.z);
+	// printf("eid=%d p0=(%f %f %f) fnorm=(%f %f %f)\n",eid,pf1.x,pf1.y,pf1.z,fnorm.x,fnorm.y,fnorm.z);
+
+	if(distf0>thick+EPS2 && distf1<thick-EPS2){	// hit: out->in
+		r->isvessel = 3;
+		r->inout = 1;
+		lm = 1-(thick-distf1)/(distf0-distf1);
+		r->Lmove = r->Lmove*lm;
+		return 1;
+	}else if(distf0<thick-EPS2 && distf1>thick+EPS2){	// hit: in->out
+		r->isvessel = 3;
+		r->inout = 0;
+		lm = (thick-distf0)/(distf1-distf0);
+		r->Lmove = r->Lmove*lm;
+		return 1;
+	}else if((distf0<=thick && distf1>=thick) || (distf0>thick && distf1>thick)){
+		r->inout = 0;
+	}else if((distf0>=thick && distf1<=thick) || (distf0<thick && distf1<thick)){
+		r->inout = 1;
+	}else{
+
+	}
+	return 0;
+}
+
 /** 
  * \brief Branch-less Badouel-based SSE4 ray-tracer to advance photon by one step
  * 
@@ -1114,7 +1169,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	    	prop=tracer->mesh->med+cfg->his.maxmedia;
 	    }else{
 	    	prop=tracer->mesh->med+(tracer->mesh->type[eid]);
-	    }    
+	    }
 
 	    rc=prop->n*R_C0;
             currweight=r->weight;
@@ -1149,56 +1204,14 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 				  break;
 			}
 		}
-	    }else if(tracer->mesh->implicit==2 && r->vesselr[0]){
-	    	float3 pf0,pf1,pv,fnorm,ptemp;
-	    	float distf0,distf1,thick,lm=0,Rtemp;
-	    	int fid,flag=0;
-	    	// const int nc[4][3]={{3,0,1},{3,1,2},{2,0,3},{1,0,2}};
-	    	thick = r->vesselr[0];
-    		Rtemp = 1e9f;
-	    	pf0 = r->p0;		// P0
-	    	vec_mult(&r->vec,r->Lmove,&ptemp);
-		vec_add(&r->p0,&ptemp,&ptemp);		// P1
-	    	for(fid=0;fid<4;fid++){
-	    		pf1 = tracer->mesh->node[ee[nc[fid][0]]-1];
-		    	fnorm.x=(&(tracer->n[baseid].x))[fid];
-			fnorm.y=(&(tracer->n[baseid].x))[fid+4];
-			fnorm.z=(&(tracer->n[baseid].x))[fid+8];
-
-	    		vec_diff(&pf0,&pf1,&pv);
-	    		distf0 = vec_dot(&pv,&fnorm);
-
-	    		vec_diff(&ptemp,&pf1,&pv);
-	    		distf1 = vec_dot(&pv,&fnorm);
-
-	    		if(distf0>thick+EPS2 && distf1<thick-EPS2){	// out->in
-	    			flag = 1;
-	    			lm = 1-(thick-distf1)/(distf0-distf1);
-	    		}else if(distf0<thick-EPS2 && distf1>thick+EPS2){	// in->out
-	    			flag = 2;
-	    			lm = (thick-distf0)/(distf1-distf0);
-	    		}else if((distf0<=thick && distf1>=thick) || (distf0>thick && distf1>thick)){
-	    			flag = 3;
-	    			lm = 1;
-	    		}else if((distf0>=thick && distf1<=thick) || (distf0<thick && distf1<thick)){
-	    			flag = 4;
-	    			lm = 1;
-	    		}else{
-
-	    		}
-	    		if(lm<Rtemp){
-	    			r->faceindex = fid;
-	    			Rtemp = lm;
-	    			if(flag==1 || flag==4)
-	    				r->inout = 1;
-	    			else
-	    				r->inout = 0;
-	    		}
+	    }else if(tracer->mesh->implicit==2){
+	    	for(int fid=0;fid<4;fid++){
+	    		if(r->vesselid[fid]==6)
+	    			continue;
+	    		hit = ray_face_intersect(r, tracer, ee, fid, baseid, eid);
+	    		if(hit)
+	    		  break;
 	    	}
-	    	if(Rtemp<1.f)
-	    		r->isvessel = 3;
-
-	    	r->Lmove = r->Lmove*Rtemp;	    	
 	    }
 
             O = _mm_load_ps(&(r->vec.x));
@@ -1385,8 +1398,8 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	float *vr;
         float mom;
 	float kahany, kahant;
-	//	p0          vec                                         pout                    bary0     eid      faceid      isend                      photonid     focus           oldidx              vesselr
-	ray r={cfg->srcpos,{cfg->srcdir.x,cfg->srcdir.y,cfg->srcdir.z},{MMC_UNDEFINED,0.f,0.f},cfg->bary0,cfg->e0,cfg->dim.y-1,0,0,1.f,0.f,0.f,0.f,0.f,0.,0,NULL,NULL,cfg->srcdir.w,0,0xFFFFFFFF,0.0,{0,0},{0.f,0.f},0,0,{0.f,0.f,0.f},{0.f,0.f,0.f},0};
+	//	p0          vec                                         pout                    bary0     eid      faceid      isend                      photonid     focus           oldidx                   vesselr
+	ray r={cfg->srcpos,{cfg->srcdir.x,cfg->srcdir.y,cfg->srcdir.z},{MMC_UNDEFINED,0.f,0.f},cfg->bary0,cfg->e0,cfg->dim.y-1,0,0,1.f,0.f,0.f,0.f,0.f,0.,0,NULL,NULL,cfg->srcdir.w,0,0xFFFFFFFF,0.0,{0,0,0,0},{0.f,0.f,0.f,0.f},0,0,{0.f,0.f,0.f},{0.f,0.f,0.f},0};
 
 	float (*engines[5])(ray *r, raytracer *tracer, mcconfig *cfg, visitor *visit)=
 	       {plucker_raytet,havel_raytet,badouel_raytet,branchless_badouel_raytet,branchless_badouel_raytet};
@@ -1439,15 +1452,29 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 #ifdef MMC_USE_SSE
 	const float int_coef_arr[4] = { -1.f, -1.f, -1.f, 1.f };
 	int_coef = _mm_load_ps(int_coef_arr);
-#endif	
+#endif
+
+	if(tracer->mesh->implicit==2){
+		init_face_inout(&r, tracer, mesh);
+	}
+
 	while(1){  /*propagate a photon until exit*/
 
-	     vid = (int *)(mesh->vessel+(r.eid-1)*2);
+	     vid = (int *)(mesh->vessel+(r.eid-1)*4);
 	     r.vesselid[0] = vid[0];
 	     r.vesselid[1] = vid[1];
-	     vr = (float *)(mesh->radius+(r.eid-1)*2);
+	     vr = (float *)(mesh->radius+(r.eid-1)*4);
 	     r.vesselr[0] = vr[0];
 	     r.vesselr[1] = vr[1];
+	     if(tracer->mesh->implicit==2){
+	     	r.vesselid[2] = vid[2];
+	     	r.vesselid[3] = vid[3];
+	     	r.vesselr[2] = vr[2];
+	     	r.vesselr[3] = vr[3];
+	     	// printf("1: id0=%d id1=%d id2=%d id3=%d\n",r.vesselid[0],r.vesselid[1],r.vesselid[2],r.vesselid[3]);
+	     }
+	     // if(r.eid==6)
+	     // 	printf("1: eid=%d id0=%d id1=%d id2=%d id3=%d\n",r.eid,r.vesselid[0],r.vesselid[1],r.vesselid[2],r.vesselid[3]);
 
 	    r.slen=(*tracercore)(&r,tracer,cfg,visit);
 	    if(r.pout.x==MMC_UNDEFINED){
@@ -1506,12 +1533,22 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	    	    if(r.pout.x!=MMC_UNDEFINED && (cfg->debuglevel&dlMove))
 	    		MMC_FPRINTF(cfg->flog,"P %f %f %f %d %lu %e\n",r.pout.x,r.pout.y,r.pout.z,r.eid,id,r.slen);
 
-	    	    vid = (int *)(mesh->vessel+(r.eid-1)*2);
+	    	    vid = (int *)(mesh->vessel+(r.eid-1)*4);
 	     	    r.vesselid[0] = vid[0];
 	     	    r.vesselid[1] = vid[1];
-	     	    vr = (float *)(mesh->radius+(r.eid-1)*2);
+	     	    vr = (float *)(mesh->radius+(r.eid-1)*4);
 	     	    r.vesselr[0] = vr[0];
 	     	    r.vesselr[1] = vr[1];
+	     	    if(tracer->mesh->implicit==2){
+		     	r.vesselid[2] = vid[2];
+		     	r.vesselid[3] = vid[3];
+		     	r.vesselr[2] = vr[2];
+		     	r.vesselr[3] = vr[3];
+		     	// printf("2: id0=%d id1=%d id2=%d id3=%d\n",r.vesselid[0],r.vesselid[1],r.vesselid[2],r.vesselid[3]);
+	     	    }
+	     	    // if(r.eid==6)
+	     	    // 	printf("2: eid=%d id0=%d id1=%d id2=%d id3=%d\n",r.eid,r.vesselid[0],r.vesselid[1],r.vesselid[2],r.vesselid[3]);
+
 
 	    	    r.slen=(*tracercore)(&r,tracer,cfg,visit);
 		    if(cfg->issavedet && r.Lmove>0.f && mesh->type[r.eid-1]>0)
@@ -1676,10 +1713,13 @@ float reflectvessel(mcconfig *cfg,float3 *c0,float3 *u,float3 *ph,float3 *E0,ray
         if(*inout){	// out->in
         	n1 = tracer->mesh->med[tracer->mesh->type[*eid-1]].n;
         	n2 = tracer->mesh->med[cfg->his.maxmedia].n;
-        	vec_mult(pn,-1.f,pn);
+        	if(isvessel==1 || isvessel==2)
+        		vec_mult(pn,-1.f,pn);
         }else{		// in->out
         	n1 = tracer->mesh->med[cfg->his.maxmedia].n;
 		n2 = tracer->mesh->med[tracer->mesh->type[*eid-1]].n;
+		if(isvessel==3)
+        		vec_mult(pn,-1.f,pn);
         }
 
 	tmp0=n1*n1;
@@ -1801,9 +1841,8 @@ float reflectray(mcconfig *cfg,float3 *c0,raytracer *tracer,int *oldeid,int *eid
 void launchphoton(mcconfig *cfg, ray *r, tetmesh *mesh, RandType *ran, RandType *ran0){
         int canfocus=1;
         float3 origin={r->p0.x,r->p0.y,r->p0.z};
-
+        r->inout = 0;
 	r->slen=rand_next_scatlen(ran);
-	r->inout = 0;
 	if(cfg->srctype==stPencil){ // pencil beam, use the old workflow, except when eid is not given
 		if(r->eid>0)
 		      return;
@@ -2000,6 +2039,44 @@ void launchphoton(mcconfig *cfg, ray *r, tetmesh *mesh, RandType *ran, RandType 
 		MESH_ERROR("initial element does not enclose the source!");
 	}
 }
+
+/**
+ * Initialize the 'inout' flag for the face-based implicit MMC
+ */
+void init_face_inout(ray *r, raytracer *tracer, tetmesh *mesh){
+		float3 pf0,pf1,pv,fnorm,ptemp;
+		float distf0,thick;
+		int flocal,eid=r->eid-1;
+		int baseid = eid<<2;
+		int *vid, *ee=(int *)(tracer->mesh->elem+eid*tracer->mesh->elemlen);
+		float *vr;
+
+		vid = (int *)(mesh->vessel+eid*4);
+		vr = (float *)(mesh->radius+eid*4);
+
+		for(int index=0;index<4;index++){
+			flocal = vid[index];
+			thick = vr[index];
+
+			pf0 = r->p0;		// P0
+			vec_mult(&r->vec,r->Lmove,&ptemp);
+			vec_add(&r->p0,&ptemp,&ptemp);		// P1
+
+			pf1 = tracer->mesh->node[ee[nc[flocal][0]]-1];	// any point on face
+		    	fnorm.x=(&(tracer->n[baseid].x))[flocal];		// normal vector of the face
+			fnorm.y=(&(tracer->n[baseid].x))[flocal+4];
+			fnorm.z=(&(tracer->n[baseid].x))[flocal+8];
+
+			vec_diff(&pf0,&pf1,&pv);
+			distf0 = vec_dot(&pv,&fnorm);
+
+			if(distf0<thick){
+				r->inout = 1;
+				break;
+			}
+		}
+		return;
+	}
 
 /**
  * @brief Deal with absorption using MCML-like algorithm (albedo-weight MC)
