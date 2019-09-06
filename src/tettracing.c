@@ -1046,7 +1046,7 @@ float ray_face_intersect(ray *r, raytracer *tracer, int *ee, int index, int base
 
 	flocal = r->vesselid[index];
 	r->faceindex = flocal;
-	thick = r->vesselr[index];
+	thick = r->vesselr[index];	
 
 	pf0 = r->p0;		// P0
 	vec_mult(&r->vec,r->Lmove,&ptemp);
@@ -1171,6 +1171,10 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	    	prop=tracer->mesh->med+(tracer->mesh->type[eid]);
 	    }
 
+
+	    // if(r->p0.z>59)
+	    // 	printf("photoid=%d prop.mua=%f\n",r->photonid,prop->mua);
+
 	    rc=prop->n*R_C0;
             currweight=r->weight;
             mus=(cfg->mcmethod==mmMCX) ? prop->mus : (prop->mua+prop->mus);
@@ -1206,6 +1210,9 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 		}
 	    }else if(tracer->mesh->implicit==2){
 	    	for(int fid=0;fid<4;fid++){
+	   //  		if((r->count==34 || r->count==35) && r->photonid==874819)
+				// printf("eid=%d vesselid=%d\n",r->eid,r->vesselid[fid]);
+	    		// if(r->vesselid[fid])
 	    		if(r->vesselid[fid]==6)
 	    			continue;
 	    		hit = ray_face_intersect(r, tracer, ee, fid, baseid, eid);
@@ -1213,6 +1220,8 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	    		  break;
 	    	}
 	    }
+	    // if(r->photonid==89)
+	    // 	printf("Lmove=%f\n",r->Lmove);
 
             O = _mm_load_ps(&(r->vec.x));
 	    S = _mm_load_ps(&(r->p0.x));
@@ -1318,6 +1327,12 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 				P =_mm_cvttps_epi32(_mm_mul_ps(S, _mm_set1_ps(dstep)));
 				_mm_store_si128((__m128i *)&(idx.x),P);
 				unsigned int newidx=idx.z*cfg->crop0.y+idx.y*cfg->crop0.x+idx.x+tshift;
+				// if(idx.x==8 && idx.y==58 && idx.z==58)
+				// 	printf("photonid=%d weight=%f Edeposit=%f\n",r->photonid,r->oldweight,tracer->mesh->weight[newidx]);
+				// if(idx.z==58 && totalloss!=0)
+				// 	printf("photonid=%d weight=%f Edeposit=%f idx=(%d %d %d)\n",r->photonid,r->oldweight,tracer->mesh->weight[newidx],idx.x,idx.y,idx.z);
+				// if(idx.z>=57)
+				// 	totalloss = 0.f;
 				r->oldidx=(r->oldidx==0xFFFFFFFF)? newidx: r->oldidx;
 				if(newidx!=r->oldidx){
 				    tracer->mesh->weight[r->oldidx]+=r->oldweight;
@@ -1457,7 +1472,10 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	if(tracer->mesh->implicit==2){
 		init_face_inout(&r, tracer, mesh);
 	}
+	// if(r.photonid==75)
+	// 	printf("inout=%d\n",r.inout);
 
+	r.count = 0;
 	while(1){  /*propagate a photon until exit*/
 
 	     vid = (int *)(mesh->vessel+(r.eid-1)*4);
@@ -1476,7 +1494,14 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	     // if(r.eid==6)
 	     // 	printf("1: eid=%d id0=%d id1=%d id2=%d id3=%d\n",r.eid,r.vesselid[0],r.vesselid[1],r.vesselid[2],r.vesselid[3]);
 
-	    r.slen=(*tracercore)(&r,tracer,cfg,visit);
+	if(r.photonid==874819)
+	    	printf("1: inout=%d p0=(%f %f %f) vec=(%f %f %f) weight=%f Lmove=%f isvessel=%d slen=%f\n",r.inout,r.p0.x,r.p0.y,r.p0.z,r.vec.x,r.vec.y,r.vec.z,r.weight,r.Lmove,r.isvessel,r.slen);
+	    r.slen=(*tracercore)(&r,tracer,cfg,visit);	    
+	if(r.photonid==874819){
+		printf("count=%d\n",++r.count);
+		printf("2: inout=%d p0=(%f %f %f) vec=(%f %f %f) weight=%f Lmove=%f isvessel=%d slen=%f\n",r.inout,r.p0.x,r.p0.y,r.p0.z,r.vec.x,r.vec.y,r.vec.z,r.weight,r.Lmove,r.isvessel,r.slen);
+	}
+
 	    if(r.pout.x==MMC_UNDEFINED){
 	    	  if(r.faceid==-2) break; /*reaches the time limit*/
 		  if(fixcount++<MAX_TRIAL){
@@ -1490,7 +1515,8 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	            r.partialpath[mesh->prop-1+mesh->type[r.eid-1]]+=r.Lmove;  /*second medianum block is the partial path*/
 	    
 	    if(cfg->isreflect && r.isvessel && (mesh->med[cfg->his.maxmedia].n != mesh->med[mesh->type[r.eid-1]].n)){
-	    	    reflectvessel(cfg,&r.vec,&r.u,&r.p0,&r.E,tracer,&r.eid,&r.inout,ran,r.isvessel,&r.faceindex);
+	    	    // printf("photonid=%d p0=(%f %f %f) vec=(%f %f %f)\n",r.photonid,r.p0.x,r.p0.y,r.p0.z,r.vec.x,r.vec.y,r.vec.z);
+	    	    reflectvessel(cfg,&r.vec,&r.u,&r.p0,&r.E,tracer,&r.eid,&r.inout,ran,r.isvessel,&r.faceindex,r.photonid);
 	    	    vec_mult_add(&r.p0,&r.vec,1.0f,10*EPS,&r.p0);
 	    	    continue;
 	    }
@@ -1505,12 +1531,26 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	    	    enb=(int *)(mesh->facenb+(r.eid-1)*mesh->elemlen);
 		    oldeid=r.eid;
 	    	    r.eid=enb[r.faceid];
-
-		    if(cfg->isreflect && (r.eid<=0 || mesh->med[mesh->type[r.eid-1]].n != mesh->med[mesh->type[oldeid-1]].n ) && !r.inout){
-			if(! (r.eid<=0 && mesh->med[mesh->type[oldeid-1]].n == cfg->nout ))
-			    reflectray(cfg,&r.vec,tracer,&oldeid,&r.eid,r.faceid,ran);
+	  //   	    if(r.photonid==90)
+			// printf("be: eid=%d oldeid=%d\n",r.eid,oldeid);
+// if(r.photonid==89)
+// 	printf("1\n");
+		    // if(cfg->isreflect && (r.eid<=0 || mesh->med[mesh->type[r.eid-1]].n != mesh->med[mesh->type[oldeid-1]].n ) && ((!r.inout && mesh->implicit==1) || (mesh->implicit==2)))
+		    if(cfg->isreflect && (r.eid<=0 || mesh->med[mesh->type[r.eid-1]].n != mesh->med[mesh->type[oldeid-1]].n ) )
+		    {
+		    	// if(r.photonid==90)
+		    	// 	printf("old_n=%f nout=%f\n",mesh->med[mesh->type[oldeid-1]].n,cfg->nout);
+			if(! (!r.inout && r.eid<=0 && mesh->med[mesh->type[oldeid-1]].n == cfg->nout )){
+			    reflectray(cfg,&r.vec,tracer,&oldeid,&r.eid,r.faceid,ran,r.inout,r.photonid);
+			 //    if(r.photonid==90)
+				// printf("af: eid=%d oldeid=%d\n",r.eid,oldeid);
+			}
 		    }
+// if(r.photonid==89)
+// 	printf("2\n");
 	    	    if(r.eid<=0) break;
+// if(r.photonid==89)
+// 	printf("3\n");
 		    /*when a photon enters the domain from the background*/
 		    if(mesh->type[oldeid-1]==0 && mesh->type[r.eid-1]){
                         if(cfg->debuglevel&dlExit)
@@ -1519,6 +1559,8 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
                         if(!cfg->voidtime)
                             r.photontimer=0.f;
                     }
+// if(r.photonid==89)
+// 	printf("4\n");
 		    /*when a photon exits the domain into the background*/
 		    if(mesh->type[oldeid-1] && mesh->type[r.eid-1]==0){
                         if(cfg->debuglevel&dlExit)
@@ -1529,6 +1571,8 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
         		    break;
                         }
 		    }
+// if(r.photonid==89)
+// 	printf("5\n");
 //		    if(r.eid!=ID_UNDEFINED && mesh->med[mesh->type[oldeid-1]].n == cfg->nout ) break;
 	    	    if(r.pout.x!=MMC_UNDEFINED && (cfg->debuglevel&dlMove))
 	    		MMC_FPRINTF(cfg->flog,"P %f %f %f %d %lu %e\n",r.pout.x,r.pout.y,r.pout.z,r.eid,id,r.slen);
@@ -1549,8 +1593,14 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	     	    // if(r.eid==6)
 	     	    // 	printf("2: eid=%d id0=%d id1=%d id2=%d id3=%d\n",r.eid,r.vesselid[0],r.vesselid[1],r.vesselid[2],r.vesselid[3]);
 
-
-	    	    r.slen=(*tracercore)(&r,tracer,cfg,visit);
+	if(r.photonid==874819)
+	    	printf("3: inout=%d p0=(%f %f %f) vec=(%f %f %f) weight=%f Lmove=%f isvessel=%d slen=%f\n",r.inout,r.p0.x,r.p0.y,r.p0.z,r.vec.x,r.vec.y,r.vec.z,r.weight,r.Lmove,r.isvessel,r.slen);
+	    	    r.slen=(*tracercore)(&r,tracer,cfg,visit);	    	    
+	if(r.photonid==874819){
+		printf("count=%d\n",++r.count);
+		printf("4: inout=%d p0=(%f %f %f) vec=(%f %f %f) weight=%f Lmove=%f isvessel=%d slen=%f\n",r.inout,r.p0.x,r.p0.y,r.p0.z,r.vec.x,r.vec.y,r.vec.z,r.weight,r.Lmove,r.isvessel,r.slen);
+	}
+	    	
 		    if(cfg->issavedet && r.Lmove>0.f && mesh->type[r.eid-1]>0)
 			r.partialpath[mesh->prop-1+mesh->type[r.eid-1]]+=r.Lmove;
 		    if(r.faceid==-2) break;
@@ -1613,7 +1663,8 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 			break;
 	    }
 	    if(cfg->isreflect && r.isvessel && (mesh->med[cfg->his.maxmedia].n != mesh->med[mesh->type[r.eid-1]].n)){
-	    	    reflectvessel(cfg,&r.vec,&r.u,&r.p0,&r.E,tracer,&r.eid,&r.inout,ran,r.isvessel,&r.faceindex);
+	    	    // printf("photonid=%d p0=(%f %f %f) vec=(%f %f %f)\n",r.photonid,r.p0.x,r.p0.y,r.p0.z,r.vec.x,r.vec.y,r.vec.z);
+	    	    reflectvessel(cfg,&r.vec,&r.u,&r.p0,&r.E,tracer,&r.eid,&r.inout,ran,r.isvessel,&r.faceindex,r.photonid);
 	    	    vec_mult_add(&r.p0,&r.vec,1.0f,10*EPS,&r.p0);
 	    	    continue;
 	    }
@@ -1681,7 +1732,7 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
  * \param[in,out] ran: the random number generator states
  */
 
-float reflectvessel(mcconfig *cfg,float3 *c0,float3 *u,float3 *ph,float3 *E0,raytracer *tracer,int *eid,int *inout,RandType *ran,int isvessel,int *faceindex){
+float reflectvessel(mcconfig *cfg,float3 *c0,float3 *u,float3 *ph,float3 *E0,raytracer *tracer,int *eid,int *inout,RandType *ran,int isvessel,int *faceindex,int photonid){
 
 	/*to handle refractive index mismatch*/
         float3 pnorm={0.f}, *pn=&pnorm, EH, ut;
@@ -1698,11 +1749,12 @@ float reflectvessel(mcconfig *cfg,float3 *c0,float3 *u,float3 *ph,float3 *E0,ray
 		vec_diff(E0,ph,pn);
 		tmp0=1.f/sqrt(vec_dot(pn,pn));
 		vec_mult(pn,tmp0,pn);
-	}else{
+	}else{			// isvessel==3, hit face vessel
 		int baseid = (*eid-1)<<2;
 		pn->x=(&(tracer->n[baseid].x))[*faceindex];
 		pn->y=(&(tracer->n[baseid].x))[*faceindex+4];
 		pn->z=(&(tracer->n[baseid].x))[*faceindex+8];
+		// printf("n=(%f %f %f)\n",pn->x,pn->y,pn->z);
 	}
 		
 	/*pn pointing outward*/
@@ -1721,6 +1773,7 @@ float reflectvessel(mcconfig *cfg,float3 *c0,float3 *u,float3 *ph,float3 *E0,ray
 		if(isvessel==3)
         		vec_mult(pn,-1.f,pn);
         }
+// printf("inout=%d norm=(%f %f %f)\n",*inout,pn->x,pn->y,pn->z);
 
 	tmp0=n1*n1;
 	tmp1=n2*n2;
@@ -1735,16 +1788,25 @@ float reflectvessel(mcconfig *cfg,float3 *c0,float3 *u,float3 *ph,float3 *E0,ray
           Rtotal=(Rtotal+(Re-Im)/(Re+Im))*0.5f; /*(Rp+Rs)/2*/
 	  // if(*oldeid==*eid) return Rtotal; /*initial specular reflection*/
 	  if(rand_next_reflect(ran)<=Rtotal){ /*do reflection*/
+          	// printf("xxxxx reflect: n1=%f n2=%f n=(%f %f %f) photonid=%d\n",n1,n2,pn->x,pn->y,pn->z,photonid);
+              // if(photonid==90)
+              // 	printf("vessel reflet\n");
               vec_mult_add(pn,c0,-2.f*Icos,1.f,c0);
               *inout = !(*inout);
               //if(cfg->debuglevel&dlReflect) MMC_FPRINTF(cfg->flog,"R %f %f %f %d %d %f\n",c0->x,c0->y,c0->z,*eid,*oldeid,Rtotal);
 	  }else if(cfg->isspecular==2 && *eid==0){
               // if do transmission, but next neighbor is 0, terminate
           }else{                              /*do transmission*/
+          	// if(photonid==90)
+           //    		printf("vessel transmit\n");
+          	// printf("xxxx transmit: n1=%f n2=%f n=(%f %f %f) photonid=%d\n",n1,n2,pn->x,pn->y,pn->z,photonid);
               vec_mult_add(pn,c0,-Icos,1.f,c0);
               vec_mult_add(pn,c0,tmp2,n1/n2,c0);
 	  }
        }else{ /*total internal reflection*/
+	  // printf("total reflect: n1=%f n2=%f n=(%f %f %f) photonid=%d\n",n1,n2,pn->x,pn->y,pn->z,photonid);
+	  // if(photonid==90)
+   //            	printf("vessel total reflect\n");
           vec_mult_add(pn,c0,-2.f*Icos,1.f,c0);
           *inout = !(*inout);
        }
@@ -1768,7 +1830,7 @@ float reflectvessel(mcconfig *cfg,float3 *c0,float3 *u,float3 *ph,float3 *E0,ray
  * \param[in,out] ran: the random number generator states
  */
 
-float reflectray(mcconfig *cfg,float3 *c0,raytracer *tracer,int *oldeid,int *eid,int faceid,RandType *ran){
+float reflectray(mcconfig *cfg,float3 *c0,raytracer *tracer,int *oldeid,int *eid,int faceid,RandType *ran,int inout, int photonid){
 	/*to handle refractive index mismatch*/
         float3 pnorm={0.f}, *pn=&pnorm;
 	float Icos,Re,Im,Rtotal,tmp0,tmp1,tmp2,n1,n2;
@@ -1790,7 +1852,10 @@ float reflectray(mcconfig *cfg,float3 *c0,raytracer *tracer,int *oldeid,int *eid
 	/*compute the cos of the incidence angle*/
         Icos=fabs(vec_dot(c0,pn));
 
-	n1=(*oldeid!=*eid) ? tracer->mesh->med[tracer->mesh->type[*oldeid-1]].n : cfg->nout;
+        if(!inout)
+		n1=(*oldeid!=*eid) ? tracer->mesh->med[tracer->mesh->type[*oldeid-1]].n : cfg->nout;
+	else
+		n1=tracer->mesh->med[cfg->his.maxmedia].n;
 	n2=(*eid>0) ? tracer->mesh->med[tracer->mesh->type[*eid-1]].n : cfg->nout;
 
 	tmp0=n1*n1;
@@ -1806,17 +1871,23 @@ float reflectray(mcconfig *cfg,float3 *c0,raytracer *tracer,int *oldeid,int *eid
           Rtotal=(Rtotal+(Re-Im)/(Re+Im))*0.5f; /*(Rp+Rs)/2*/
 	  if(*oldeid==*eid) return Rtotal; /*initial specular reflection*/
 	  if(rand_next_reflect(ran)<=Rtotal){ /*do reflection*/
+          // if(photonid==90)
+          // 	printf("reflect\n");
               vec_mult_add(pn,c0,-2.f*Icos,1.f,c0);
               //if(cfg->debuglevel&dlReflect) MMC_FPRINTF(cfg->flog,"R %f %f %f %d %d %f\n",c0->x,c0->y,c0->z,*eid,*oldeid,Rtotal);
 	      *eid=*oldeid; /*stay with the current element*/
 	  }else if(cfg->isspecular==2 && *eid==0){
               // if do transmission, but next neighbor is 0, terminate
           }else{                              /*do transmission*/
+          // if(photonid==90)
+          // 	printf("transmit\n");
               vec_mult_add(pn,c0,-Icos,1.f,c0);
               vec_mult_add(pn,c0,tmp2,n1/n2,c0);
               //if(cfg->debuglevel&dlReflect) MMC_FPRINTF(cfg->flog,"Z %f %f %f %d %d %f\n",c0->x,c0->y,c0->z,*eid,*oldeid,1.f-Rtotal);
 	  }
        }else{ /*total internal reflection*/
+	// if(photonid==90)
+ //          	printf("total reflect\n");
           vec_mult_add(pn,c0,-2.f*Icos,1.f,c0);
 	  *eid=*oldeid;
           //if(cfg->debuglevel&dlReflect) MMC_FPRINTF(cfg->flog,"V %f %f %f %d %d %f\n",c0->x,c0->y,c0->z,*eid,*oldeid,1.f);
@@ -1841,7 +1912,7 @@ float reflectray(mcconfig *cfg,float3 *c0,raytracer *tracer,int *oldeid,int *eid
 void launchphoton(mcconfig *cfg, ray *r, tetmesh *mesh, RandType *ran, RandType *ran0){
         int canfocus=1;
         float3 origin={r->p0.x,r->p0.y,r->p0.z};
-        r->inout = 0;
+        r->inout = 1;
 	r->slen=rand_next_scatlen(ran);
 	if(cfg->srctype==stPencil){ // pencil beam, use the old workflow, except when eid is not given
 		if(r->eid>0)
