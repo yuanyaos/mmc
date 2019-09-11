@@ -1223,7 +1223,6 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 			r->vesselr[3] = newvr[3];
     		}
 
-
 	    	for(int fid=0;fid<4;fid++){
 	    		if(r->vesselid[fid]==6)
 	    			continue;
@@ -1529,7 +1528,7 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 		    if(cfg->isreflect && (r.eid<=0 || mesh->med[mesh->type[r.eid-1]].n != mesh->med[mesh->type[oldeid-1]].n ) )
 		    {
 			if(! (!r.inout && r.eid<=0 && mesh->med[mesh->type[oldeid-1]].n == cfg->nout )){
-			    reflectray(cfg,&r.vec,tracer,&oldeid,&r.eid,r.faceid,ran,r.inout,r.photonid);
+			    reflectray(cfg,&r.vec,tracer,&oldeid,&r.eid,r.faceid,ran);
 			}
 		    }
 	    	    if(r.eid<=0) break;
@@ -1790,7 +1789,7 @@ float reflectvessel(mcconfig *cfg,float3 *c0,float3 *u,float3 *ph,float3 *E0,ray
  * \param[in,out] ran: the random number generator states
  */
 
-float reflectray(mcconfig *cfg,float3 *c0,raytracer *tracer,int *oldeid,int *eid,int faceid,RandType *ran,int inout, int photonid){
+float reflectray(mcconfig *cfg,float3 *c0,raytracer *tracer,int *oldeid,int *eid,int faceid,RandType *ran){
 	/*to handle refractive index mismatch*/
         float3 pnorm={0.f}, *pn=&pnorm;
 	float Icos,Re,Im,Rtotal,tmp0,tmp1,tmp2,n1,n2;
@@ -1812,10 +1811,7 @@ float reflectray(mcconfig *cfg,float3 *c0,raytracer *tracer,int *oldeid,int *eid
 	/*compute the cos of the incidence angle*/
         Icos=fabs(vec_dot(c0,pn));
 
-        if(!inout)
-		n1=(*oldeid!=*eid) ? tracer->mesh->med[tracer->mesh->type[*oldeid-1]].n : cfg->nout;
-	else
-		n1=tracer->mesh->med[cfg->his.maxmedia].n;
+	n1=(*oldeid!=*eid) ? tracer->mesh->med[tracer->mesh->type[*oldeid-1]].n : cfg->nout;
 	n2=(*eid>0) ? tracer->mesh->med[tracer->mesh->type[*eid-1]].n : cfg->nout;
 
 	tmp0=n1*n1;
@@ -1831,23 +1827,17 @@ float reflectray(mcconfig *cfg,float3 *c0,raytracer *tracer,int *oldeid,int *eid
           Rtotal=(Rtotal+(Re-Im)/(Re+Im))*0.5f; /*(Rp+Rs)/2*/
 	  if(*oldeid==*eid) return Rtotal; /*initial specular reflection*/
 	  if(rand_next_reflect(ran)<=Rtotal){ /*do reflection*/
-          // if(photonid==90)
-          // 	printf("reflect\n");
               vec_mult_add(pn,c0,-2.f*Icos,1.f,c0);
               //if(cfg->debuglevel&dlReflect) MMC_FPRINTF(cfg->flog,"R %f %f %f %d %d %f\n",c0->x,c0->y,c0->z,*eid,*oldeid,Rtotal);
 	      *eid=*oldeid; /*stay with the current element*/
 	  }else if(cfg->isspecular==2 && *eid==0){
               // if do transmission, but next neighbor is 0, terminate
           }else{                              /*do transmission*/
-          // if(photonid==90)
-          // 	printf("transmit\n");
               vec_mult_add(pn,c0,-Icos,1.f,c0);
               vec_mult_add(pn,c0,tmp2,n1/n2,c0);
               //if(cfg->debuglevel&dlReflect) MMC_FPRINTF(cfg->flog,"Z %f %f %f %d %d %f\n",c0->x,c0->y,c0->z,*eid,*oldeid,1.f-Rtotal);
 	  }
        }else{ /*total internal reflection*/
-	// if(photonid==90)
- //          	printf("total reflect\n");
           vec_mult_add(pn,c0,-2.f*Icos,1.f,c0);
 	  *eid=*oldeid;
           //if(cfg->debuglevel&dlReflect) MMC_FPRINTF(cfg->flog,"V %f %f %f %d %d %f\n",c0->x,c0->y,c0->z,*eid,*oldeid,1.f);
