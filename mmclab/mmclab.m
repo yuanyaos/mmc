@@ -262,7 +262,11 @@ for i=1:len
         if(cfg(i).implicit==1)
             vessel(idx,:) = reorient(vessel(idx,:)+1);
         elseif(cfg(i).implicit==2)
+            vtemp = vessel;
+            rc = find(vessel<0);
+            vessel(rc) = 6;
             vessel(idx,:) = reorient_face(vessel(idx,:)+1);
+            vessel(rc) = vtemp(rc);
         end
         cfg(i).isreoriented=1;
     end
@@ -318,7 +322,11 @@ for i=1:len
             if(cfg(i).implicit==1)
                 vessel(idx,:) = reorient(vessel(idx,:)+1);
             elseif(cfg(i).implicit==2)
+                vtemp = vessel;
+                rc = find(vessel<0);
+                vessel(rc) = 6;
                 vessel(idx,:) = reorient_face(vessel(idx,:)+1);
+                vessel(rc) = vtemp(rc);
             end
             cfg(i).facenb=faceneighbors(cfg(i).elem);
             cfg(i).evol=elemvolume(cfg(i).node,cfg(i).elem);

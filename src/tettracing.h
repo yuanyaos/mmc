@@ -69,7 +69,7 @@ typedef struct MMC_ray{
 	float3 u;		      /**< vessel edge direction */
 	float3 E;		      /**< the starting node of vessel edge */
 	int faceindex;		      /**< local face index that the photon intersect with*/
-	int count;
+	int faceeid;		      /**< reference element id that is used for face-based implicit MMC*/
 } ray;
 
 /***************************************************************************//**
@@ -105,7 +105,7 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,RandType 
 void launchphoton(mcconfig *cfg, ray *r, tetmesh *mesh, RandType *ran, RandType *ran0);
 void init_face_inout(ray *r, raytracer *tracer,tetmesh *mesh);
 float reflectray(mcconfig *cfg,float3 *c0,raytracer *tracer,int *oldeid,int *eid,int faceid,RandType *ran,int inout, int photonid);
-float reflectvessel(mcconfig *cfg,float3 *c0,float3 *u,float3 *ph,float3 *E0,raytracer *tracer,int *eid,int *inout,RandType *ran,int isvessel,int *faceindex,int photonid);
+float reflectvessel(mcconfig *cfg,float3 *c0,float3 *u,float3 *ph,float3 *E0,raytracer *tracer,int *eid,int *inout,RandType *ran,int isvessel,int *faceindex,int *faceeid);
 void save_scatter_events(ray *r, tetmesh *mesh, mcconfig *cfg, visitor *visit);
 void albedoweight(ray *r, tetmesh *mesh, mcconfig *cfg, visitor *visit);
 void visitor_init(mcconfig *cfg, visitor* visit);
