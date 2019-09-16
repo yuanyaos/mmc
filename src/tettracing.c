@@ -1178,7 +1178,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	    r->isend=(Lp0>dlen);
 	    r->Lmove=((r->isend) ? dlen : Lp0);
 
-	    if(tracer->mesh->implicit==1){
+	    if(cfg->implicit==1){
 		if(r->vesselid[0]<6 && !hit){	// vesselid==6: there is no edge labeled as vessel in the current element		
 		// update r->isvessel, r->inout, r->u, r->E0, r->Lmove
 		hit = ray_cylinder_intersect(r, tracer, ee, 0);
@@ -1197,7 +1197,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 				  break;
 			}
 		}
-	    }else if(tracer->mesh->implicit==2){
+	    }else if(cfg->implicit==2){
 	    	int noface=0, neweid, newbaseid;
 	    	int *newvid, *newee;
 	    	float *newvr;
@@ -1478,7 +1478,7 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	int_coef = _mm_load_ps(int_coef_arr);
 #endif
 
-	if(tracer->mesh->implicit==2){
+	if(cfg->implicit==2){
 		init_face_inout(&r, tracer, mesh);
 	}
 
@@ -1490,7 +1490,7 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	     vr = (float *)(mesh->radius+(r.eid-1)*4);
 	     r.vesselr[0] = vr[0];
 	     r.vesselr[1] = vr[1];
-	     if(tracer->mesh->implicit==2){
+	     if(cfg->implicit==2){
 	     	r.vesselid[2] = vid[2];
 	     	r.vesselid[3] = vid[3];
 	     	r.vesselr[2] = vr[2];
@@ -1561,7 +1561,7 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	     	    vr = (float *)(mesh->radius+(r.eid-1)*4);
 	     	    r.vesselr[0] = vr[0];
 	     	    r.vesselr[1] = vr[1];
-	     	    if(tracer->mesh->implicit==2){
+	     	    if(cfg->implicit==2){
 		     	r.vesselid[2] = vid[2];
 		     	r.vesselid[3] = vid[3];
 		     	r.vesselr[2] = vr[2];

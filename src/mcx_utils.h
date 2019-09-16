@@ -182,6 +182,7 @@ typedef struct MMC_config{
 	int printnum;                  /**<number of printed threads (for debugging)*/
         int replaydet;                 /**<the detector id for which to replay the detected photons, start from 1
 				           0 for wide-field detection pattern*/
+	int implicit;		       /**<1 for edge- or node-based implicit MMC, 2 for face-based implicit MMC*/
 	unsigned char *vol;            /**<pointer to the volume*/
 	char session[MAX_SESSION_LENGTH];/**<session id, a string*/
         char meshtag[MAX_PATH_LENGTH];   /**<a string to tag all input mesh files*/

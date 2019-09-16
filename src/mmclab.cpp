@@ -476,9 +476,9 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
           mesh->nradius[i]=val[3*mesh->nn+i];
         }
     }else if(strcmp(name,"implicit")==0){
-        double *val=mxGetPr(item);
-        mesh->implicit=(int) val[0];
-        printf("mmc.implicit=%d;\n",mesh->implicit);
+	double *val=mxGetPr(item);
+	cfg->implicit=val[0];
+        printf("mmc.implicit=%d;\n",cfg->implicit);
     }
     else if(strcmp(name,"elem")==0){
         arraydim=mxGetDimensions(item);

@@ -68,7 +68,7 @@ colormap jet
 
 figure,imagesc(log10(squeeze(flux.data(:,30,:))),[-5 8]),colormap jet
 
-% save /space/neza/2/users/yaoshen/NEU/Research/mmc/data/face_vessel_mu05_r3 flux
+% save /space/neza/2/users/yaoshen/NEU/Research/mmc/data/face_vessel_n685_r3 flux
 
 %% Compare original MMC and vessel MMC
 
@@ -78,7 +78,7 @@ xx = xx'; yy = yy';
 
 levels = -5:8;
 figure,
-load /drives/neza2/users/yaoshen/NEU/Research/mmc/data/face_original_mu05_r3
+load /drives/neza2/users/yaoshen/NEU/Research/mmc/data/face_original_n685_r3
 flux_original = rot90(squeeze(flux.data(1:end-1,n,1:end-1)),1);
 ax1 = subplot(131);
 imagesc(log10(flux_original),[-5 8]);
@@ -86,7 +86,7 @@ title(['Original, slice=' num2str(n)])
 colormap(ax1,jet)
 
 clear flux
-load /space/neza/2/users/yaoshen/NEU/Research/mmc/data/face_vessel_mu05_r3
+load /space/neza/2/users/yaoshen/NEU/Research/mmc/data/face_vessel_n685_r3
 flux_vessel = rot90(squeeze(flux.data(1:end-1,n,1:end-1)),1);
 ax2 = subplot(132);
 imagesc(log10(flux_vessel),[-5 8]);
