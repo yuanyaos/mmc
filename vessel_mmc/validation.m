@@ -15,7 +15,8 @@ node = [node [1 0 0 0 0 0 0 1]'];
 pse(1) = 1;
 pse(2) = 8;
 [vessel,vesseln,pathelem,nodeelem] = vessellabel(elem,node,pse,2,0);
-elem = [elem vessel 6*ones(size(vessel)) 2*ones(size(vessel)) ones(size(vessel))];
+% elem = [elem vessel 6*ones(size(vessel)) 2*ones(size(vessel)) ones(size(vessel))];
+elem = [elem vessel 6*ones(size(vessel)) 6*ones(size(vessel)) 6*ones(size(vessel)) 2*ones(size(vessel)) ones(size(vessel)) ones(size(vessel)) ones(size(vessel))];
 
 %% complex
 
@@ -47,11 +48,8 @@ elem = [elem vessel 6*ones(size(vessel)) 2*ones(size(vessel)) ones(size(vessel))
 clear cfg
 cfg.nphoton=1e7;
 cfg.node = node;
-% cfg.node = [cfg.node vesseln];
 cfg.elem = elem;
-% cfg.elem = [cfg.elem vessel];
-% plotvessel(cfg.elem,cfg.node)
-cfg.vessel = 1;
+cfg.implicit = 1;
 cfg.elemprop=ones(size(cfg.elem,1),1);
 % cfg.vessel = vessel;
 % cfg.radius = 2*ones(size(cfg.elem,1),1);
@@ -107,6 +105,41 @@ colormap(ax1,jet)
 
 clear flux
 load /drives/neza2/users/yaoshen/NEU/Research/mmc/gpu_2vessel
+flux_vessel = rot90(squeeze(flux.data(:,:,n)),-1);
+ax2 = subplot(132);
+imagesc(log10(flux_vessel),[2 5]);
+title(['GPU, slice=' num2str(n)])
+colormap(ax2,jet)
+
+ax3 = subplot(133);
+contourf(xx,yy,log10(flux_original),levels,'LineWidth',0.1);
+hold on
+p1 = contour(xx,yy,log10(flux_original),levels,'-k','ShowText','on');
+
+clear flux
+p2 = contour(xx,yy,log10(flux_vessel),levels,'linestyle','--','color','w','linewidth',1,'ShowText','on');
+legend('Original','Original','Vessel')
+legend boxoff
+caxis([1.5,5]);
+colormap(ax3,parula)
+
+%%
+
+n = 35;
+[xx,yy]=meshgrid(0:60,0:50); 
+xx = xx'; yy = yy';
+
+levels = -5:0.5:8;
+figure,
+load /drives/neza2/users/yaoshen/NEU/Research/mmc/data/flux_vesselmua05
+flux_original = rot90(squeeze(flux.data(:,:,n)),-1);
+ax1 = subplot(131);
+imagesc(log10(flux_original),[2 5]);
+title(['CPU, slice=' num2str(n)])
+colormap(ax1,jet)
+
+clear flux
+load /drives/neza2/users/yaoshen/NEU/Research/mmc/data/flux_originalmua05
 flux_vessel = rot90(squeeze(flux.data(:,:,n)),-1);
 ax2 = subplot(132);
 imagesc(log10(flux_vessel),[2 5]);

@@ -17,6 +17,9 @@ addpath('/drives/neza2/users/yaoshen/NEU/Research/mmc/mmcx/mmc/vessel_mmcx/dijks
 %% run mmc
 
 load mesh.mat
+elem = [elem 6*ones(size(elem,1),4) 0*ones(size(elem,1),4)];
+node = [node zeros(size(node,1),1)];
+node(133,4) = 3;
 
 clear cfg
 cfg.nphoton=1e7;
@@ -24,7 +27,7 @@ cfg.node = node;
 cfg.elem = elem;
 cfg.implicit = 1;
 cfg.elemprop=ones(size(cfg.elem,1),1);
-cfg.srcpos=[30.5 30.5 0];
+cfg.srcpos=[12.5 12.5 0];
 cfg.srcdir=[0 0 1];
 cfg.prop=[0 0 1 1;0.005 1 0 1.37;0 0 1 1];
 % cfg.prop=[0 0 1 1;0.036 1.0320 0 1.37;0.21 0.4638 0 1.37];
