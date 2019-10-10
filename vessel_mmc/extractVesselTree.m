@@ -81,16 +81,16 @@ for i=1:length(STACK)
     rr(i) = STACK(i).radius;
     parent(i) = STACK(i).parent;
 end
-figure,scatter3(xx,yy,zz,rr,'r','filled')
-xlabel('x'),ylabel('y'),zlabel('z')
-title(['segment=' num2str(segment)])
+figure,scatter3(xx,yy,zz,2*rr,'r','filled')
+% xlabel('x'),ylabel('y'),zlabel('z')
+% title(['segment=' num2str(segment)])
 axis equal
 
 %% Simplify tree
 
 nc = 1;
 prev = [xx(1) yy(1) zz(1)];
-noder(nc) = rr(10);
+noder(nc) = rr(1);
 node(nc,:) = prev;
 node_str{nc} = num2str(prev);
 nc = nc+1;
