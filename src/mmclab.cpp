@@ -482,8 +482,8 @@ void mmc_set_field(const mxArray *root,const mxArray *item,int idx, mcconfig *cf
     }
     else if(strcmp(name,"elem")==0){
         arraydim=mxGetDimensions(item);
-	if(arraydim[0]<=0 || arraydim[1]<8)
-            MEXERROR("the 'elem' field must have 8 columns (e1,e2,e3,e4,vessel1,vessel2,r1,r2)");
+	if(arraydim[0]<=0 || arraydim[1]<12)
+            MEXERROR("the 'elem' field must have 12 columns (e1,e2,e3,e4,vessel1,vessel2,vessel3,vessel4,r1,r2,r3,r4)");
         double *val=mxGetPr(item);
         mesh->ne=arraydim[0];
 	// mesh->elemlen=arraydim[1];

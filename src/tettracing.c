@@ -926,13 +926,14 @@ float ray_cylinder_intersect(ray *r, raytracer *tracer, int *ee, int index){
 	vec_mult(&u,st,&Pt);
 	vec_diff(&Pt,&OP,&PP1);		// PP1: P1 projection on plane
 	DIS1 = vec_dot(&PP1,&PP1);
-
+// if(r->photonid==9)
+// 	printf("Lmove=%f\n",r->Lmove);
 	// update Lmove and reflection
 	float dx, dy, dr2, drr2, Dt, delta, rt, rt2, sgn, xa, xb, ya, yb, Dp;
 	rt = r->vesselr[index];
 	rt2 = rt*rt;	
 	if((DIS0>rt2+EPS2 && DIS1<rt2-EPS2) || (DIS0<rt2-EPS2 && DIS1>rt2+EPS2)) 	// hit vessel out->in or in->out
-	{		
+	{	
 		r->isvessel = 1;
 
 		DIS0 = sqrtf(DIS0);
@@ -982,12 +983,18 @@ float ray_cylinder_intersect(ray *r, raytracer *tracer, int *ee, int index){
 			}
 		}
 		r->Lmove = r->Lmove*Lratio;
+		// if(r->photonid==9)
+		// 	printf("1: %f\n",r->Lmove);
 		return 1;
 	}
 	else if((DIS0<=rt2 && DIS1>=rt2) || (DIS0>rt2 && DIS1>rt2)){
+		// if(r->photonid==9)
+		// 	printf("2: %f\n",r->Lmove);
 		r->inout = 0;
 	}
 	else if((DIS0>=rt2 && DIS1<=rt2) || (DIS0<rt2 && DIS1<rt2)){
+		// if(r->photonid==9)
+		// 	printf("3: %f\n",r->Lmove);
 		r->inout = 1;
 	}else{
 
@@ -1125,7 +1132,8 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	const __m128 Ny=_mm_load_ps(&(tracer->n[baseid+1].x));
 	const __m128 Nz=_mm_load_ps(&(tracer->n[baseid+2].x));
 	const __m128 dd=_mm_load_ps(&(tracer->n[baseid+3].x));
-
+// if(r->photonid==9)
+// 	printf("p0=(%f %f %f)\n",r->p0.x,r->p0.y,r->p0.z);
 	O = _mm_set1_ps(r->p0.x);
 	T = _mm_mul_ps(Nx,O);
 	O = _mm_set1_ps(r->p0.y);
@@ -1177,14 +1185,39 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 	    Lp0=bary.x;
 	    r->isend=(Lp0>dlen);
 	    r->Lmove=((r->isend) ? dlen : Lp0);
-
+// if(r->photonid==9)
+// 	printf("p=(%f %f %f) isend=%d dlen=%f Lp0=%f Lmove=%f\n",r->p0.x,r->p0.y,r->p0.z,r->isend,dlen,Lp0,r->Lmove);
 	    if(cfg->implicit==1){
+	    	// maximum 4 vessels are allowed in an element
+	  //   	for(int vi=0;vi<4;vi++){
+	  //   		if(r->vesselid[vi]==6)
+	  //   		  continue;
+	  //   		hit = ray_cylinder_intersect(r, tracer, ee, vi);
+	  //   		if(hit)
+	  //   		  break;
+	  //   	}
+	  //   	if(!hit){
+	  //   		float nr;
+			// for(int ih=0;ih<4;ih++){	// check if hits any node vessel
+			// 	nr = tracer->mesh->nradius[ee[ih]-1];
+			// 	if(!nr)
+			// 	  continue;
+			// 	hit = ray_sphere_intersect(r, tracer, ee, ih, nr);
+			// 	if(hit)
+			// 	  break;
+			// }
+	  //   	}
+
 		if(r->vesselid[0]<6 && !hit){	// vesselid==6: there is no edge labeled as vessel in the current element		
 		// update r->isvessel, r->inout, r->u, r->E0, r->Lmove
 		hit = ray_cylinder_intersect(r, tracer, ee, 0);
+		// if(r->photonid==9)
+		// 	printf("1: hit=%d Lmove=%f\n",hit,r->Lmove);
 		}else if(r->vesselid[1]<6 && !hit){
 			// update r->isvessel, r->inout, r->u, r->E0, r->Lmove
 		hit = ray_cylinder_intersect(r, tracer, ee, 1);
+		// if(r->photonid==9)
+		// 	printf("2: hit=%d Lmove=%f\n",hit,r->Lmove);
 		}
 		else if(!hit){	// not hit any vessel in the current element
 			float nr;
@@ -1197,6 +1230,7 @@ float branchless_badouel_raytet(ray *r, raytracer *tracer, mcconfig *cfg, visito
 				  break;
 			}
 		}
+
 	    }else if(cfg->implicit==2){
 	    	int noface=0, neweid, newbaseid;
 	    	int *newvid, *newee;
@@ -1495,8 +1529,11 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 	     	r.vesselid[3] = vid[3];
 	     	r.vesselr[2] = vr[2];
 	     	r.vesselr[3] = vr[3];
-	     }
+	     }	     	
+
+// printf("1: photonid=%d eid=%d\n",r.photonid,r.eid);
 	    r.slen=(*tracercore)(&r,tracer,cfg,visit);
+// printf("2: photonid=%d eid=%d\n",r.photonid,r.eid);
 
 	    if(r.pout.x==MMC_UNDEFINED){
 	    	  if(r.faceid==-2) break; /*reaches the time limit*/
@@ -1568,7 +1605,9 @@ void onephoton(size_t id,raytracer *tracer,tetmesh *mesh,mcconfig *cfg,
 		     	r.vesselr[3] = vr[3];
 	     	    }
 
+// printf("3: photonid=%d eid=%d\n",r.photonid,r.eid);
 	    	    r.slen=(*tracercore)(&r,tracer,cfg,visit);
+// printf("4: photonid=%d eid=%d\n",r.photonid,r.eid);
 		    if(cfg->issavedet && r.Lmove>0.f && mesh->type[r.eid-1]>0)
 			r.partialpath[mesh->prop-1+mesh->type[r.eid-1]]+=r.Lmove;
 		    if(r.faceid==-2) break;

@@ -46,7 +46,7 @@ elem = [elem vessel 6*ones(size(vessel)) 6*ones(size(vessel)) 6*ones(size(vessel
 %% run mmc
 
 clear cfg
-cfg.nphoton=1e7;
+cfg.nphoton=1e6;
 cfg.node = node;
 cfg.elem = elem;
 cfg.implicit = 1;
